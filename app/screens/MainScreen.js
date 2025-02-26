@@ -1,10 +1,11 @@
 import { View, Text, TouchableOpacity, Image } from "react-native";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 import Logo from "../../components/Logo";
 import * as ImagePicker from "expo-image-picker"; // Import ImagePicker
 import * as FileSystem from "expo-file-system"; // Import FileSystem
 import { detectObjects } from "../api/detection"; // Import detectObjects api
+import { translate } from "../api/translate";
 
 const MainScreen = () => {
   const [imageUri, setImageUri] = useState(null); // State to store the image URI
@@ -19,6 +20,26 @@ const MainScreen = () => {
     width: 0,
     height: 0,
   });
+
+  const [translation, setTranslation] = useState("Translating...");
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function fetchTranslation() {
+      try {
+        const result = await translate("Hello, world!");
+        if (result) {
+          setTranslation(result);
+        } else {
+          setError("Translation failed");
+        }
+      } catch (err) {
+        setError("Error: " + err.message);
+      }
+    }
+
+    fetchTranslation();
+  }, []);
 
   // 上传图片
   const handleUpload = async () => {
@@ -202,6 +223,13 @@ const MainScreen = () => {
           className="p-2.5 bg-[#FF914D] rounded"
         >
           <Text className="text-white">❤️</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => {}}
+          className="p-2.5 bg-[#FF914D] rounded"
+        >
+          <Text>{error ? error : translation}</Text>
         </TouchableOpacity>
       </View>
     </View>
