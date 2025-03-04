@@ -5,7 +5,6 @@ import Logo from "../../components/Logo";
 import * as ImagePicker from "expo-image-picker"; // Import ImagePicker
 import * as FileSystem from "expo-file-system"; // Import FileSystem
 import { detectObjects } from "../api/detection"; // Import detectObjects api
-import { translate } from "../api/translate";
 
 const MainScreen = () => {
   const [imageUri, setImageUri] = useState(null); // State to store the image URI
@@ -20,9 +19,6 @@ const MainScreen = () => {
     width: 0,
     height: 0,
   });
-
-  const [translation, setTranslation] = useState("Translating...");
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     async function fetchTranslation() {
@@ -223,13 +219,6 @@ const MainScreen = () => {
           className="p-2.5 bg-[#FF914D] rounded"
         >
           <Text className="text-white">❤️</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => {}}
-          className="p-2.5 bg-[#FF914D] rounded"
-        >
-          <Text>{error ? error : translation}</Text>
         </TouchableOpacity>
       </View>
     </View>
