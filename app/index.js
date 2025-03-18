@@ -1,21 +1,3 @@
-// import { StyleSheet, Text, View, Button } from "react-native";
-// import MainScreen from "./screens/MainScreen";
-// import { TracksProvider } from "./context/TrackProvider";
-
-// export default function Page() {
-//   return (
-//     <View className="flex-1">
-//       <MainScreen />
-//     </View>
-//   );
-// }
-
-// import { Redirect } from "expo-router";
-
-// export default function Page() {
-//   return <Redirect href="/tabs" />;
-// }
-
 import { Redirect } from "expo-router";
 import { View, Text, ActivityIndicator, Image } from "react-native";
 import { useEffect, useState } from "react";

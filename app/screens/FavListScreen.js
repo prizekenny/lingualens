@@ -1,119 +1,99 @@
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
-import React, { useState } from "react";
-import { Ionicons } from "@expo/vector-icons";
-import PlaylistItem from "../../components/PlayListItem";
-import { useRouter } from "expo-router";
-import { useTracks } from "../context/TrackProvider";
-import NowPlaying from "../../components/NowPlaying";
+import React, { useEffect, useState } from "react";
+import { View, Text, ScrollView, ActivityIndicator } from "react-native";
+import { useFavorites } from "../context/FavoritesProvider";
+import { useTranslate } from "../api/translate";
+import { useLanguage } from "../context/LanguageProvider";
 
 const FavListScreen = () => {
-  const [isRandom, setIsRandom] = useState(false);
-  const router = useRouter();
-  const { tracks, setPlayingTrack, updateTrack } = useTracks();
+  const { favorites } = useFavorites();
+  const { translateText } = useTranslate();
+  const { language } = useLanguage();
+  const [translatedFavorites, setTranslatedFavorites] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Get favorite tracks
-  const favoriteTracks = tracks.filter(track => track.favorite);
+  useEffect(() => {
+    const processFavorites = async () => {
+      setLoading(true);
 
-  // Handle play
-  const handlePlay = (track) => {
-    setPlayingTrack(track);
-    router.push("/music");
-  };
+      const translations = await Promise.all(
+        favorites.map(async (fav) => {
+          if (fav.translation && fav.exampleTranslation) {
+            return {
+              english: fav.word,
+              translation: fav.translation,
+              example: fav.example || "No example available.",
+              exampleTranslation: fav.exampleTranslation,
+            };
+          }
 
-  // Toggle favorite status
-  const handleToggleFavorite = async (id) => {
-    const updatedTrack = tracks.find((track) => track.id === id);
-    if (updatedTrack) {
-      updateTrack(id, { favorite: !updatedTrack.favorite });
+          try {
+            const translatedWord = await translateText(fav.word);
+            const translatedExample = await translateText(fav.example || "");
+            return {
+              english: fav.word,
+              translation: translatedWord,
+              example: fav.example || "No example available.",
+              exampleTranslation: translatedExample,
+            };
+          } catch (err) {
+            console.error("Translation failed for:", fav.word, err);
+            return {
+              english: fav.word,
+              translation: "Translation failed",
+              example: fav.example || "No example available.",
+              exampleTranslation: "",
+            };
+          }
+        })
+      );
+
+      setTranslatedFavorites(translations);
+      setLoading(false);
+    };
+
+    if (favorites.length > 0) {
+      processFavorites();
+    } else {
+      setTranslatedFavorites([]);
+      setLoading(false);
     }
-  };
-
-  // Play all tracks
-  const handlePlayAll = () => {
-    if (favoriteTracks.length > 0) {
-      const trackToPlay = isRandom 
-        ? favoriteTracks[Math.floor(Math.random() * favoriteTracks.length)]
-        : favoriteTracks[0];
-      handlePlay(trackToPlay);
-    }
-  };
-
-  // Toggle random state
-  const toggleRandom = () => {
-    setIsRandom(!isRandom);
-  };
+  }, [favorites, language]); // 放在外层 useEffect 的依赖数组
 
   return (
-    <View className="bg-background flex-1 flex-col px-5 pt-8">
-      {/* Header */}
-      <View className="flex-row items-center justify-between mb-6">
-        <Text className="text-2xl font-bold text-textPrimary">Favorite Songs</Text>
-        <Text className="text-gray-500">{favoriteTracks.length} songs</Text>
-      </View>
-
-      {/* Play Controls */}
-      <View className="flex-row items-center justify-between bg-white rounded-xl p-4 mb-6 shadow-sm">
-        <TouchableOpacity 
-          onPress={handlePlayAll}
-          className="flex-row items-center"
-        >
-          <Ionicons name="play-circle" size={32} color="#4CAF50" />
-          <Text className="ml-2 text-lg font-semibold text-textPrimary">
-            Play All
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          onPress={toggleRandom}
-          className="flex-row items-center"
-        >
-          <Ionicons 
-            name={isRandom ? "shuffle" : "shuffle-outline"} 
-            size={24} 
-            color={isRandom ? "#4CAF50" : "#666"} 
-          />
-          <Text className={`ml-1 ${isRandom ? "text-green-600" : "text-gray-600"}`}>
-            Random
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Playlist */}
-      <ScrollView
-        showsVerticalScrollIndicator={true}
-        keyboardShouldPersistTaps="handled"
-        nestedScrollEnabled={true}
-        className="gap-2 pb-24"
-      >
-        {favoriteTracks.length === 0 ? (
-          <Text className="text-center text-gray-500 mt-10">
-            No favorite songs yet
-          </Text>
-        ) : (
-          favoriteTracks.map((track) => (
-            <View key={track.id}>
-              <PlaylistItem
-                id={track.id}
-                name={track.name}
-                artist={track.artist}
-                duration={track.duration}
-                favorite={track.favorite}
-                onPlay={() => handlePlay(track)}
-                onToggleFavorite={() => handleToggleFavorite(track.id)}
-                onArtistPress={() => router.push({
-                  pathname: "/artist/[name]",
-                  params: { name: track.artist }
-                })}
-              />
+    <View className="flex-1 px-4 pt-14 bg-white">
+      <Text className="text-2xl font-bold mb-4">Favorites</Text>
+      {loading ? (
+        <View className="flex-1 justify-center items-center mt-5">
+          <ActivityIndicator size="large" color="#FF914D" />
+          <Text className="text-gray-500 mt-2">Loading translations...</Text>
+        </View>
+      ) : translatedFavorites.length === 0 ? (
+        <Text className="text-gray-500 text-center mt-10">
+          No favorites yet.
+        </Text>
+      ) : (
+        <ScrollView>
+          {translatedFavorites.map((item, index) => (
+            <View key={index} className="mb-6 border-b border-gray-200 pb-4">
+              <Text className="text-lg font-semibold text-gray-900">
+                {index + 1}. {item.english}
+              </Text>
+              <Text className="text-orange-500 text-base mt-1">
+                {item.translation}
+              </Text>
+              <Text className="text-gray-500 text-sm mt-2">Example:</Text>
+              <Text className="text-gray-600 text-sm mt-1 italic">
+                {item.example}
+              </Text>
+              {item.exampleTranslation && (
+                <Text className="text-orange-400 text-sm mt-1">
+                  {item.exampleTranslation}
+                </Text>
+              )}
             </View>
-          ))
-        )}
-      </ScrollView>
-
-      {/* Now Playing */}
-      <View>
-        <NowPlaying />
-      </View>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 };

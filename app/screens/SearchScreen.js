@@ -5,60 +5,60 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { fetchWordDetails } from "../api/dictionary"; // 保留字典查询
-import { useTranslate } from "../api/translate"; // 使用封装好的翻译 Hook
+import { fetchWordDetails } from "../api/dictionary";
+import { useTranslate } from "../api/translate";
+import WordCard from "../../components/WordCard";
 
 const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [translatedQuery, setTranslatedQuery] = useState([]);
+  const [wordDetail, setWordDetail] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const { translateText } = useTranslate(); // 动态获取翻译函数
+  const { translateText } = useTranslate();
 
   const handleTranslate = async () => {
     if (searchQuery.trim() === "") return;
 
     setIsLoading(true);
     setErrorMessage("");
-    setTranslatedQuery([]);
 
     try {
       const wordDetails = await fetchWordDetails(searchQuery);
 
-      const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
       let translatedDefinitions = [];
       for (const def of wordDetails.definitions) {
         try {
-          const translatedText = await translateText(def.definition);
+          const translatedDefinition = await translateText(def.definition);
+          const translatedExample = def.example
+            ? await translateText(def.example)
+            : "";
           translatedDefinitions.push({
-            original: def.definition,
-            translated: translatedText,
+            definition: def.definition,
+            translatedDefinition,
             example: def.example,
+            exampleTranslation: translatedExample,
           });
-          await delay(50); // 稍微大一点的延迟，避免API过载
         } catch (translationError) {
-          console.log("Translation error:", translationError.message);
           translatedDefinitions.push({
-            original: def.definition,
-            translated: "Translation unavailable",
+            definition: def.definition,
+            translatedDefinition: "Translation unavailable",
             example: def.example,
+            exampleTranslation: "",
           });
         }
       }
 
-      setTranslatedQuery(translatedDefinitions);
+      setWordDetail({
+        phonetic: wordDetails.phonetic,
+        definitions: translatedDefinitions,
+      });
     } catch (error) {
-      if (!error.message.includes("429")) {
-        console.error("Dictionary fetch error:", error);
-        setErrorMessage(error.message);
-      } else {
-        console.log("API rate limit exceeded:", error.message);
-        setErrorMessage("Translation service is busy, please try again later.");
-      }
+      console.error("Error fetching word details:", error);
+      setErrorMessage("Word not found or API error.");
     } finally {
       setIsLoading(false);
     }
@@ -66,19 +66,18 @@ const SearchScreen = () => {
 
   const handleCancel = () => {
     setSearchQuery("");
-    setTranslatedQuery([]);
+    setWordDetail(null);
     setErrorMessage("");
   };
 
   return (
     <View className="flex-1 px-5 mt-14">
-      {/* 搜索区域 */}
       <View className="my-3">
         <View className="flex-row items-center bg-gray-100 border-2 border-orange-500 rounded-full px-4 h-12">
-          <Ionicons name="search" size={20} color="#aaa" className="mr-2" />
+          <Ionicons name="search" size={20} color="#aaa" />
           <TextInput
             className="flex-1 pl-2 pb-1 text-base text-gray-800 bg-transparent"
-            placeholder="Enter text to translate..."
+            placeholder="Enter word..."
             placeholderTextColor="#aaa"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -99,41 +98,31 @@ const SearchScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* 翻译结果 */}
       <ScrollView
         className="flex-1"
-        showsVerticalScrollIndicator={true}
-        contentContainerStyle={{ flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1, alignItems: "center" }}
       >
         {isLoading && (
-          <View className="flex-1 justify-center items-center mt-5">
-            <Text className="text-base text-gray-800">Loading...</Text>
+          <View className="mt-10">
+            <ActivityIndicator size="large" color="#FF914D" />
+            <Text className="text-base text-gray-800 mt-2">Loading...</Text>
           </View>
         )}
 
         {errorMessage !== "" && (
-          <View className="flex-1 justify-center items-center mt-5">
+          <View className="mt-10">
             <Text className="text-base text-red-500">{errorMessage}</Text>
           </View>
         )}
 
-        {translatedQuery.length > 0 && (
-          <View className="mt-5 pb-10">
-            {translatedQuery.map((item, index) => (
-              <View key={index} className="mb-6">
-                <Text className="text-sm text-gray-800">
-                  {index + 1}. {item.original}
-                </Text>
-                <Text className="text-sm text-orange-500 mt-1">
-                  {item.translated}
-                </Text>
-                {item.example && (
-                  <Text className="text-xs text-gray-500 mt-1">
-                    Example: {item.example}
-                  </Text>
-                )}
-              </View>
-            ))}
+        {wordDetail && (
+          <View className="mt-5 mb-10 w-full items-center">
+            <WordCard
+              wordName={searchQuery}
+              wordDetail={wordDetail}
+              onClose={handleCancel}
+            />
           </View>
         )}
       </ScrollView>

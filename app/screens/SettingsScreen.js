@@ -16,14 +16,14 @@ export const languageCodeMap = {
 };
 
 const languages = [
-  { code: "en-US", label: "United States [US]" },
-  { code: "en-UK", label: "English [UK]" },
+  { code: "zh-CN", label: "Chinese" },
+  // { code: "en-US", label: "United States [US]" },
+  // { code: "en-UK", label: "English [UK]" },
   { code: "fr", label: "French" },
   { code: "de", label: "German" },
   { code: "ja", label: "Japanese" },
   { code: "ko", label: "Korean" },
   { code: "es", label: "Spanish" },
-  { code: "zh-CN", label: "Chinese" },
 ];
 
 export default function SettingsScreen() {
@@ -31,13 +31,7 @@ export default function SettingsScreen() {
   const router = useRouter();
 
   return (
-    <View className="flex-1 p-4 bg-white">
-      <TouchableOpacity
-        onPress={() => router.replace("/MainScreen")}
-        className="mb-4 p-2 bg-gray-300 rounded w-24 items-center"
-      >
-        <Text>⬅ Back</Text>
-      </TouchableOpacity>
+    <View className="flex-1 px-4 pt-14 bg-white">
       <Text className="text-2xl font-bold mb-4">Settings</Text>
       <Text className="text-xl font-semibold mb-2">Language</Text>
       <ScrollView>

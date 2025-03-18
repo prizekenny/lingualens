@@ -1,9 +1,12 @@
-import { View, Text } from "react-native";
-import React from "react";
+// import { View, Text } from "react-native";
+// import React from "react";
+// import FavoritesScreen from "../screens/FavoritesScreen";
+
+// const FavListTab = () => {
+//   return <FavoritesScreen />;
+// };
+
+// export default FavListTab;
+
 import FavListScreen from "../screens/FavListScreen";
-
-const FavListTab = () => {
-  return <FavListScreen />;
-};
-
-export default FavListTab;
+export default FavListScreen;
