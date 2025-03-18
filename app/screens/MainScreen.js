@@ -77,20 +77,63 @@ const MainScreen = () => {
 
   // 拍照
   const handleTakePhoto = async () => {
-    const result = await ImagePicker.launchCameraAsync();
+    // 请求相机权限
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      alert('Permission to access camera is required!');
+      return;
+    }
+    
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: false,
+      quality: 1,
+    });
+    
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const capturedAsset = result.assets[0];
       console.log("Captured image URI:", capturedAsset.uri);
       setImageUri(capturedAsset.uri);
-      if (capturedAsset.uri.startsWith("file://")) {
-        const base64 = await FileSystem.readAsStringAsync(capturedAsset.uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        const objects = await detectObjects(null, base64);
-        setDetectedObjects(objects);
+      
+      // 获取图像宽高
+      const { width, height } = await new Promise((resolve) => {
+        Image.getSize(capturedAsset.uri, (width, height) =>
+          resolve({ width, height })
+        );
+      });
+
+      // 根据容器尺寸和原图宽高计算显示尺寸
+      const containerWidth = containerDimensions.width;
+      const containerHeight = containerDimensions.height;
+      const aspectRatio = width / height;
+      let newWidth, newHeight;
+      
+      if (containerWidth / containerHeight > aspectRatio) {
+        newHeight = containerHeight;
+        newWidth = containerHeight * aspectRatio;
       } else {
-        const objects = await detectObjects(capturedAsset.uri);
+        newWidth = containerWidth;
+        newHeight = containerWidth / aspectRatio;
+      }
+      
+      const top = (containerHeight - newHeight) / 2;
+      const left = (containerWidth - newWidth) / 2;
+      setImagePosition({ top, left, width: newWidth, height: newHeight });
+
+      // 调用检测 API
+      try {
+        let objects;
+        if (capturedAsset.uri.startsWith("file://")) {
+          const base64 = await FileSystem.readAsStringAsync(capturedAsset.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          objects = await detectObjects(null, base64);
+        } else {
+          objects = await detectObjects(capturedAsset.uri);
+        }
         setDetectedObjects(objects);
+      } catch (error) {
+        console.error("Object detection error:", error);
+        alert("Failed to detect objects in the image");
       }
     }
   };
