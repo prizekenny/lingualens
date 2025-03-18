@@ -7,14 +7,16 @@ import {
   ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { translate } from "../api/translate"; // Import translation function
-import { fetchWordDetails } from "../api/dictionary"; // Import dictionary function
+import { fetchWordDetails } from "../api/dictionary"; // 保留字典查询
+import { useTranslate } from "../api/translate"; // 使用封装好的翻译 Hook
 
 const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [translatedQuery, setTranslatedQuery] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const { translateText } = useTranslate(); // 动态获取翻译函数
 
   const handleTranslate = async () => {
     if (searchQuery.trim() === "") return;
@@ -26,26 +28,23 @@ const SearchScreen = () => {
     try {
       const wordDetails = await fetchWordDetails(searchQuery);
 
-      // 添加延迟功能以避免API限流
       const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-      // 使用 reduce 而不是 Promise.all 来按顺序处理每个定义，避免并发请求
       let translatedDefinitions = [];
       for (const def of wordDetails.definitions) {
         try {
-          const translatedText = await translate(def.definition);
+          const translatedText = await translateText(def.definition);
           translatedDefinitions.push({
             original: def.definition,
             translated: translatedText,
             example: def.example,
           });
-          await delay(10);
+          await delay(50); // 稍微大一点的延迟，避免API过载
         } catch (translationError) {
-          // 翻译失败时不显示错误，使用原文或占位符
           console.log("Translation error:", translationError.message);
           translatedDefinitions.push({
             original: def.definition,
-            translated: "Translation unavailable", // 或者您可以使用原文
+            translated: "Translation unavailable",
             example: def.example,
           });
         }
@@ -53,12 +52,10 @@ const SearchScreen = () => {
 
       setTranslatedQuery(translatedDefinitions);
     } catch (error) {
-      // 只显示词典查询错误，而不是翻译错误
       if (!error.message.includes("429")) {
-        console.error("词典查询错误 Dictionary fetch error:", error);
+        console.error("Dictionary fetch error:", error);
         setErrorMessage(error.message);
       } else {
-        // 对于429错误，显示更友好的消息
         console.log("API rate limit exceeded:", error.message);
         setErrorMessage("Translation service is busy, please try again later.");
       }
@@ -75,7 +72,7 @@ const SearchScreen = () => {
 
   return (
     <View className="flex-1 px-5 mt-14">
-      {/* 固定在顶部的搜索区域 */}
+      {/* 搜索区域 */}
       <View className="my-3">
         <View className="flex-row items-center bg-gray-100 border-2 border-orange-500 rounded-full px-4 h-12">
           <Ionicons name="search" size={20} color="#aaa" className="mr-2" />
@@ -102,7 +99,7 @@ const SearchScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* 可滚动的内容区域 */}
+      {/* 翻译结果 */}
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={true}
@@ -127,7 +124,7 @@ const SearchScreen = () => {
                 <Text className="text-sm text-gray-800">
                   {index + 1}. {item.original}
                 </Text>
-                <Text className="text-sm text-gray-600 mt-1">
+                <Text className="text-sm text-orange-500 mt-1">
                   {item.translated}
                 </Text>
                 {item.example && (

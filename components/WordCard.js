@@ -1,18 +1,31 @@
-import React from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
+import { useTranslate } from "../app/api/translate";
 
 const WordCard = ({ wordName, wordDetail = {}, onClose }) => {
-  // 设置默认值，防止 wordDetail 为空时出错
   const { phonetic = "", definitions = [] } = wordDetail;
-  
+  const { translateText } = useTranslate();
+  const [translatedWord, setTranslatedWord] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const doTranslate = async () => {
+      setLoading(true);
+      const result = await translateText(wordName);
+      setTranslatedWord(result);
+      setLoading(false);
+    };
+    doTranslate();
+  }, [wordName]);
+
   return (
     <View
       style={{
-        width: '90%', // 屏幕宽度的90%
-        backgroundColor: '#1F2937',
+        width: "90%",
+        backgroundColor: "#1F2937",
         borderRadius: 12,
         padding: 24,
-        shadowColor: '#000',
+        shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 3.84,
@@ -20,6 +33,11 @@ const WordCard = ({ wordName, wordDetail = {}, onClose }) => {
       }}
     >
       <Text className="text-white text-2xl font-bold mb-2">{wordName}</Text>
+      {loading ? (
+        <ActivityIndicator color="#FF914D" />
+      ) : (
+        <Text className="text-orange-400 text-xl mb-2">{translatedWord}</Text>
+      )}
       {phonetic && (
         <Text className="text-gray-400 text-lg mb-4">{phonetic}</Text>
       )}

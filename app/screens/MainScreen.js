@@ -7,7 +7,11 @@ import * as FileSystem from "expo-file-system"; // Import FileSystem
 import { detectObjects } from "../api/detection"; // Import detectObjects api
 import WordCard from "../../components/WordCard"; // 引入 WordCard 组件
 
+import { useRouter } from "expo-router";
+
 const MainScreen = () => {
+  const router = useRouter();
+
   const [imageUri, setImageUri] = useState(null); // State to store the image URI
   const [detectedObjects, setDetectedObjects] = useState([]); // 存储检测到的物体
   const [containerDimensions, setContainerDimensions] = useState({
@@ -79,21 +83,21 @@ const MainScreen = () => {
   const handleTakePhoto = async () => {
     // 请求相机权限
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      alert('Permission to access camera is required!');
+    if (status !== "granted") {
+      alert("Permission to access camera is required!");
       return;
     }
-    
+
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: false,
       quality: 1,
     });
-    
+
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const capturedAsset = result.assets[0];
       console.log("Captured image URI:", capturedAsset.uri);
       setImageUri(capturedAsset.uri);
-      
+
       // 获取图像宽高
       const { width, height } = await new Promise((resolve) => {
         Image.getSize(capturedAsset.uri, (width, height) =>
@@ -106,7 +110,7 @@ const MainScreen = () => {
       const containerHeight = containerDimensions.height;
       const aspectRatio = width / height;
       let newWidth, newHeight;
-      
+
       if (containerWidth / containerHeight > aspectRatio) {
         newHeight = containerHeight;
         newWidth = containerHeight * aspectRatio;
@@ -114,7 +118,7 @@ const MainScreen = () => {
         newWidth = containerWidth;
         newHeight = containerWidth / aspectRatio;
       }
-      
+
       const top = (containerHeight - newHeight) / 2;
       const left = (containerWidth - newWidth) / 2;
       setImagePosition({ top, left, width: newWidth, height: newHeight });
@@ -249,20 +253,26 @@ const MainScreen = () => {
         >
           <Text className="text-white">❤️</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => router.push("/screens/SettingsScreen")}
+          className="p-2.5 bg-[#FF914D] rounded" //
+        >
+          <Text className="text-white">⚙️</Text>
+        </TouchableOpacity>
       </View>
 
       {/* 显示 WordCard 弹窗 */}
       {selectedWord && (
         <View
           style={{
-            position: 'absolute',
+            position: "absolute",
             top: 0,
             bottom: 0,
             left: 0,
             right: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            justifyContent: 'center',
-            alignItems: 'center',
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
             zIndex: 1000,
           }}
         >
@@ -271,9 +281,15 @@ const MainScreen = () => {
             wordDetail={{
               phonetic: "/example/",
               definitions: [
-                { definition: "Example definition 1", example: "Example usage 1" },
-                { definition: "Example definition 2", example: "Example usage 2" },
-              ]
+                {
+                  definition: "Example definition 1",
+                  example: "Example usage 1",
+                },
+                {
+                  definition: "Example definition 2",
+                  example: "Example usage 2",
+                },
+              ],
             }}
             onClose={() => setSelectedWord(null)}
           />
