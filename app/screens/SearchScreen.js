@@ -1,14 +1,34 @@
-import React, { useState } from "react";
-import { View, Text, TouchableOpacity, TextInput } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, TouchableOpacity, TextInput, FlatList } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { translate } from "../api/translate"; // Import translation function
 import { fetchWordDetails } from "../api/dictionary"; // Import dictionary function
+import { searchHistoryOperations } from "../database/wordRepository"; // 导入搜索历史操作
 
 const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [translatedQuery, setTranslatedQuery] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [searchHistory, setSearchHistory] = useState([]); // 添加搜索历史状态
+  
+  // 临时用户ID，实际应用中应从认证或上下文中获取
+  const userId = 1;
+
+  // 加载搜索历史
+  const loadSearchHistory = async () => {
+    try {
+      const history = await searchHistoryOperations.getRecentUniqueSearches(userId);
+      setSearchHistory(history);
+    } catch (error) {
+      console.error("加载搜索历史失败:", error);
+    }
+  };
+
+  // 组件挂载时加载搜索历史
+  useEffect(() => {
+    loadSearchHistory();
+  }, []);
 
   const handleTranslate = async () => {
     if (searchQuery.trim() === "") return;
@@ -32,6 +52,11 @@ const SearchScreen = () => {
       );
 
       setTranslatedQuery(translatedDefinitions);
+      
+      // 保存搜索历史
+      await searchHistoryOperations.addSearchHistory(userId, searchQuery);
+      // 重新加载搜索历史
+      loadSearchHistory();
     } catch (error) {
       console.error("词典查询错误 Dictionary fetch error:", error);
       setErrorMessage(error.message);
@@ -44,6 +69,22 @@ const SearchScreen = () => {
     setSearchQuery("");
     setTranslatedQuery([]);
     setErrorMessage("");
+  };
+  
+  // 从历史记录选择单词
+  const selectHistoryWord = (word) => {
+    setSearchQuery(word);
+    handleTranslate();
+  };
+  
+  // 清除所有搜索历史
+  const clearSearchHistory = async () => {
+    try {
+      await searchHistoryOperations.clearSearchHistory(userId);
+      setSearchHistory([]);
+    } catch (error) {
+      console.error("清除搜索历史失败:", error);
+    }
   };
 
   return (
@@ -103,6 +144,30 @@ const SearchScreen = () => {
               )}
             </View>
           ))}
+        </View>
+      )}
+      
+      {/* 搜索历史区域 */}
+      {searchHistory.length > 0 && translatedQuery.length === 0 && !isLoading && (
+        <View className="mt-5">
+          <View className="flex-row justify-between items-center mb-2">
+            <Text className="text-lg font-bold text-gray-800">搜索历史</Text>
+            <TouchableOpacity onPress={clearSearchHistory}>
+              <Text className="text-orange-500">清除</Text>
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={searchHistory}
+            keyExtractor={(item, index) => `history-${index}`}
+            renderItem={({ item }) => (
+              <TouchableOpacity 
+                className="py-3 border-b border-gray-200"
+                onPress={() => selectHistoryWord(item.word)}
+              >
+                <Text className="text-base text-gray-700">{item.word}</Text>
+              </TouchableOpacity>
+            )}
+          />
         </View>
       )}
     </View>

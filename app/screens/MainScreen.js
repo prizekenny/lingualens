@@ -6,6 +6,8 @@ import * as ImagePicker from "expo-image-picker"; // Import ImagePicker
 import * as FileSystem from "expo-file-system"; // Import FileSystem
 import { detectObjects } from "../api/detection"; // Import detectObjects api
 import WordCard from "../../components/WordCard"; // 引入 WordCard 组件
+// 导入数据库相关操作
+import { imageOperations, detectionOperations } from "../database/wordRepository";
 
 const MainScreen = () => {
   const [imageUri, setImageUri] = useState(null); // State to store the image URI
@@ -21,6 +23,30 @@ const MainScreen = () => {
     height: 0,
   });
   const [selectedWord, setSelectedWord] = useState(null); // 用于存储选中的单词
+  // 添加保存图片ID的状态
+  const [savedImageId, setSavedImageId] = useState(null);
+  // 使用临时用户ID，实际应用中应从认证或上下文中获取
+  const userId = 1;
+
+  // 保存检测到的对象到数据库
+  const saveDetectedObjects = async (imageId, objects) => {
+    try {
+      // 批量保存识别到的对象
+      await detectionOperations.saveMultipleDetections(
+        userId, 
+        imageId, 
+        objects.map(obj => ({
+          name: obj.name,
+          value: obj.value,
+          boundingBox: obj.boundingBox,
+          translation: obj.translated // 假设API返回的对象可能有翻译
+        }))
+      );
+      console.log("保存检测对象成功");
+    } catch (error) {
+      console.error("保存检测对象失败:", error);
+    }
+  };
 
   // 上传图片
   const handleUpload = async () => {
@@ -59,16 +85,34 @@ const MainScreen = () => {
       const left = (containerWidth - newWidth) / 2;
       setImagePosition({ top, left, width: newWidth, height: newHeight });
 
-      // 调用检测 API
-      if (selectedAsset.uri.startsWith("file://")) {
-        const base64 = await FileSystem.readAsStringAsync(selectedAsset.uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        const objects = await detectObjects(null, base64);
+      // 保存图片到数据库
+      try {
+        const imageId = await imageOperations.saveImage(
+          userId,
+          selectedAsset.uri,
+          'upload_' + new Date().getTime(),
+          null,
+          width,
+          height
+        );
+        setSavedImageId(imageId);
+        
+        // 调用检测 API
+        let objects;
+        if (selectedAsset.uri.startsWith("file://")) {
+          const base64 = await FileSystem.readAsStringAsync(selectedAsset.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          objects = await detectObjects(null, base64);
+        } else {
+          objects = await detectObjects(selectedAsset.uri);
+        }
         setDetectedObjects(objects);
-      } else {
-        const objects = await detectObjects(selectedAsset.uri);
-        setDetectedObjects(objects);
+        
+        // 保存检测结果到数据库
+        await saveDetectedObjects(imageId, objects);
+      } catch (error) {
+        console.error("处理图片失败:", error);
       }
     } else {
       console.log("Image selection was cancelled or no assets found.");
@@ -119,8 +163,19 @@ const MainScreen = () => {
       const left = (containerWidth - newWidth) / 2;
       setImagePosition({ top, left, width: newWidth, height: newHeight });
 
-      // 调用检测 API
+      // 保存图片到数据库
       try {
+        const imageId = await imageOperations.saveImage(
+          userId,
+          capturedAsset.uri,
+          'camera_' + new Date().getTime(),
+          null,
+          width,
+          height
+        );
+        setSavedImageId(imageId);
+
+        // 调用检测 API
         let objects;
         if (capturedAsset.uri.startsWith("file://")) {
           const base64 = await FileSystem.readAsStringAsync(capturedAsset.uri, {
@@ -131,6 +186,9 @@ const MainScreen = () => {
           objects = await detectObjects(capturedAsset.uri);
         }
         setDetectedObjects(objects);
+        
+        // 保存检测结果到数据库
+        await saveDetectedObjects(imageId, objects);
       } catch (error) {
         console.error("Object detection error:", error);
         alert("Failed to detect objects in the image");
@@ -156,6 +214,35 @@ const MainScreen = () => {
   };
 
   const topObjects = getTopObjects(detectedObjects);
+
+  // 获取单词详情
+  const getWordDetail = async (word) => {
+    try {
+      // 查询单词是否已存在于数据库
+      const { exists, wordId, isFavorite } = await detectionOperations.wordOperations.checkWordFavoriteStatus(userId, word);
+      
+      if (exists) {
+        // 如果单词存在，获取详细信息
+        return await detectionOperations.wordCardOperations.getWordDetailsForCard(wordId);
+      } else {
+        // 单词不存在，返回基本信息
+        return {
+          phonetic: "",
+          definitions: [
+            { definition: "查看单词详情" }
+          ]
+        };
+      }
+    } catch (error) {
+      console.error("获取单词详情失败:", error);
+      return {
+        phonetic: "",
+        definitions: [
+          { definition: "无法获取单词详情" }
+        ]
+      };
+    }
+  };
 
   return (
     <View className="bg-background flex-1 flex-col mt-12">
