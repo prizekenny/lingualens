@@ -1,11 +1,19 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, ScrollView, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  ScrollView,
+  ActivityIndicator,
+  TouchableOpacity,
+  Alert,
+} from "react-native";
 import { useFavorites } from "../context/FavoritesProvider";
 import { useTranslate } from "../api/translate";
 import { useLanguage } from "../context/LanguageProvider";
+import { deleteFavorite } from "../api/favorites"; // ⬅ 一定要引入删除API
 
 const FavListScreen = () => {
-  const { favorites } = useFavorites();
+  const { favorites, refreshFavorites } = useFavorites(); // ⬅ 注意这里多了个refreshFavorites
   const { translateText } = useTranslate();
   const { language } = useLanguage();
   const [translatedFavorites, setTranslatedFavorites] = useState([]);
@@ -18,29 +26,23 @@ const FavListScreen = () => {
       const translations = await Promise.all(
         favorites.map(async (fav) => {
           if (fav.translation && fav.exampleTranslation) {
-            return {
-              english: fav.word,
-              translation: fav.translation,
-              example: fav.example || "No example available.",
-              exampleTranslation: fav.exampleTranslation,
-            };
+            return { ...fav };
           }
-
           try {
-            const translatedWord = await translateText(fav.word);
-            const translatedExample = await translateText(fav.example || "");
+            const [translatedWord, translatedExample] = await Promise.all([
+              translateText(fav.word),
+              translateText(fav.example || ""),
+            ]);
             return {
-              english: fav.word,
+              ...fav,
               translation: translatedWord,
-              example: fav.example || "No example available.",
               exampleTranslation: translatedExample,
             };
           } catch (err) {
             console.error("Translation failed for:", fav.word, err);
             return {
-              english: fav.word,
+              ...fav,
               translation: "Translation failed",
-              example: fav.example || "No example available.",
               exampleTranslation: "",
             };
           }
@@ -57,7 +59,33 @@ const FavListScreen = () => {
       setTranslatedFavorites([]);
       setLoading(false);
     }
-  }, [favorites, language]); // 放在外层 useEffect 的依赖数组
+  }, [favorites, language]);
+
+  const handleDelete = async (id) => {
+    Alert.alert(
+      "Delete Favorite",
+      "Are you sure you want to delete this favorite?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteFavorite(id);
+              await refreshFavorites(); // 删除后刷新列表
+            } catch (err) {
+              console.error("Failed to delete favorite:", err);
+              Alert.alert(
+                "Error",
+                "Could not delete favorite. Please try again."
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <View className="flex-1 px-4 pt-14 bg-white">
@@ -74,16 +102,27 @@ const FavListScreen = () => {
       ) : (
         <ScrollView>
           {translatedFavorites.map((item, index) => (
-            <View key={index} className="mb-6 border-b border-gray-200 pb-4">
-              <Text className="text-lg font-semibold text-gray-900">
-                {index + 1}. {item.english}
-              </Text>
+            <View
+              key={item.id || index}
+              className="mb-6 border-b border-gray-200 pb-4"
+            >
+              <View className="flex-row justify-between items-center">
+                <Text className="text-lg font-semibold text-gray-900">
+                  {index + 1}. {item.word}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => handleDelete(item.id)}
+                  className="bg-red-500 px-2 py-1 rounded"
+                >
+                  <Text className="text-white">Delete</Text>
+                </TouchableOpacity>
+              </View>
               <Text className="text-orange-500 text-base mt-1">
                 {item.translation}
               </Text>
               <Text className="text-gray-500 text-sm mt-2">Example:</Text>
               <Text className="text-gray-600 text-sm mt-1 italic">
-                {item.example}
+                {item.example || "No example available."}
               </Text>
               {item.exampleTranslation && (
                 <Text className="text-orange-400 text-sm mt-1">

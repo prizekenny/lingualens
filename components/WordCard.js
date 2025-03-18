@@ -10,40 +10,69 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslate } from "../app/api/translate";
 import { useLanguage } from "../app/context/LanguageProvider";
 import { useFavorites } from "../app/context/FavoritesProvider";
+import { fetchWordDetails } from "../app/api/dictionary";
 
-const WordCard = ({ wordName, wordDetail = {}, onClose }) => {
-  const { phonetic = "", definitions = [] } = wordDetail;
+const WordCard = ({ wordName, onClose }) => {
   const { translateText } = useTranslate();
   const { language } = useLanguage();
-  const { favorites, toggleFavorite, isFavoriteExist } = useFavorites();
+  const { toggleFavorite, isFavoriteExist, favorites } = useFavorites();
 
   const [translatedWord, setTranslatedWord] = useState("");
+  const [wordDetails, setWordDetails] = useState(null);
+  const [exampleTranslation, setExampleTranslation] = useState("");
   const [loading, setLoading] = useState(true);
   const [isFavorited, setIsFavorited] = useState(false);
 
   useEffect(() => {
-    const doTranslate = async () => {
+    const loadWordData = async () => {
       setLoading(true);
-      const wordResult = await translateText(wordName);
-      setTranslatedWord(wordResult);
+      try {
+        const details = await fetchWordDetails(wordName);
+        setWordDetails(details);
+        const translated = await translateText(wordName);
+        setTranslatedWord(translated);
+
+        if (details.definitions[0]?.example) {
+          const exampleTranslated = await translateText(
+            details.definitions[0].example
+          );
+          setExampleTranslation(exampleTranslated);
+        } else {
+          setExampleTranslation("");
+        }
+      } catch (error) {
+        setWordDetails({
+          phonetic: "",
+          definitions: [{ definition: "No definition found.", example: "" }],
+        });
+        setExampleTranslation("");
+      }
+
       setIsFavorited(isFavoriteExist({ word: wordName }));
       setLoading(false);
     };
-    doTranslate();
+
+    loadWordData();
   }, [wordName, language, favorites]);
 
-  const handleToggleFavorite = () => {
-    const firstExample = definitions[0]?.example || "";
-    const firstExampleTranslation = definitions[0]?.exampleTranslation || "";
+  const handleToggleFavorite = async () => {
+    try {
+      await toggleFavorite({
+        word: wordName,
+        translation: translatedWord,
+        example: wordDetails?.definitions[0]?.example || "",
+        exampleTranslation,
+      });
 
-    toggleFavorite({
-      word: wordName,
-      translation: translatedWord,
-      example: firstExample,
-      exampleTranslation: firstExampleTranslation,
-    });
-    setIsFavorited(!isFavorited);
-    Alert.alert(isFavorited ? "Removed from favorites" : "Added to favorites!");
+      const nowFavorite = isFavoriteExist({ word: wordName });
+      setIsFavorited(nowFavorite);
+      Alert.alert(
+        nowFavorite ? "Added to favorites!" : "Removed from favorites"
+      );
+    } catch (err) {
+      console.error("Toggle favorite failed:", err);
+      Alert.alert("Error", "Could not toggle favorite. Please try again.");
+    }
   };
 
   return (
@@ -53,19 +82,11 @@ const WordCard = ({ wordName, wordDetail = {}, onClose }) => {
         backgroundColor: "#1F2937",
         borderRadius: 12,
         padding: 24,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        elevation: 5,
       }}
     >
-      <View className="flex-row items-center justify-between mb-2">
+      <View className="flex-row items-center justify-between mb-4">
         <Text className="text-white text-2xl font-bold">
-          {wordName}{" "}
-          <Text className="text-orange-400">
-            {loading ? "..." : translatedWord}
-          </Text>
+          {wordName} <Text className="text-orange-400">{translatedWord}</Text>
         </Text>
         <TouchableOpacity onPress={handleToggleFavorite}>
           <Ionicons
@@ -76,36 +97,33 @@ const WordCard = ({ wordName, wordDetail = {}, onClose }) => {
         </TouchableOpacity>
       </View>
 
-      {phonetic && (
-        <Text className="text-gray-400 text-lg mb-4">/{phonetic}/</Text>
-      )}
+      {wordDetails?.phonetic ? (
+        <Text className="text-gray-400 text-lg mb-4">
+          {wordDetails.phonetic}
+        </Text>
+      ) : null}
 
-      <View>
-        {definitions.map((def, index) => (
-          <View key={index} className="mb-4">
-            <Text className="text-white text-base">
-              {index + 1}. {def.definition}
-            </Text>
-            {def.translatedDefinition && (
-              <Text className="text-orange-300 text-sm mt-1">
-                {def.translatedDefinition}
+      {loading ? (
+        <ActivityIndicator color="orange" />
+      ) : (
+        <View>
+          <Text className="text-white text-base mb-2">
+            {wordDetails?.definitions[0]?.definition || "No definition."}
+          </Text>
+          {wordDetails?.definitions[0]?.example ? (
+            <>
+              <Text className="text-gray-400 text-sm">
+                Example: {wordDetails.definitions[0].example}
               </Text>
-            )}
-            {def.example && (
-              <>
-                <Text className="text-gray-400 text-sm mt-1">
-                  Example: {def.example}
-                </Text>
-                {def.exampleTranslation && (
-                  <Text className="text-orange-400 text-sm mt-1">
-                    {def.exampleTranslation}
-                  </Text>
-                )}
-              </>
-            )}
-          </View>
-        ))}
-      </View>
+              <Text className="text-orange-400 text-sm mt-1">
+                {exampleTranslation}
+              </Text>
+            </>
+          ) : (
+            <Text className="text-gray-400 text-sm">No example available.</Text>
+          )}
+        </View>
+      )}
 
       <TouchableOpacity
         onPress={onClose}

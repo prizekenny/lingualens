@@ -18,23 +18,24 @@ export const useFavorites = () => {
 export const FavoritesProvider = ({ children }) => {
   const [favorites, setFavorites] = useState([]);
 
+  const refreshFavorites = async () => {
+    try {
+      const data = await apiGetFavorites();
+      setFavorites(data);
+    } catch (error) {
+      console.error("Error fetching favorites:", error);
+    }
+  };
+
   useEffect(() => {
-    const fetchFavorites = async () => {
-      try {
-        const data = await apiGetFavorites();
-        setFavorites(data);
-      } catch (error) {
-        console.error("Error fetching favorites:", error);
-      }
-    };
-    fetchFavorites();
+    refreshFavorites();
   }, []);
 
   const addFavorite = async (favorite) => {
     if (isFavoriteExist(favorite)) return;
     try {
-      const added = await apiAddFavorite(favorite);
-      setFavorites((prev) => [...prev, added]);
+      await apiAddFavorite(favorite);
+      await refreshFavorites();
     } catch (err) {
       console.error("Error adding favorite:", err);
     }
@@ -43,7 +44,7 @@ export const FavoritesProvider = ({ children }) => {
   const deleteFavorite = async (id) => {
     try {
       await apiDeleteFavorite(id);
-      setFavorites((prev) => prev.filter((item) => item.id !== id));
+      await refreshFavorites();
     } catch (err) {
       console.error("Error deleting favorite:", err);
     }
@@ -54,12 +55,14 @@ export const FavoritesProvider = ({ children }) => {
       (item) => item.word.toLowerCase() === favorite.word.toLowerCase()
     );
 
-  const toggleFavorite = (favorite) => {
-    const existing = favorites.find((item) => item.word === favorite.word);
+  const toggleFavorite = async (favorite) => {
+    const existing = favorites.find(
+      (item) => item.word.toLowerCase() === favorite.word.toLowerCase()
+    );
     if (existing) {
-      deleteFavorite(existing.id);
+      await deleteFavorite(existing.id);
     } else {
-      addFavorite(favorite);
+      await addFavorite(favorite);
     }
   };
 
@@ -71,6 +74,7 @@ export const FavoritesProvider = ({ children }) => {
         deleteFavorite,
         toggleFavorite,
         isFavoriteExist,
+        refreshFavorites,
       }}
     >
       {children}
