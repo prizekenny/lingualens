@@ -1,10 +1,11 @@
-import { View, Text, TouchableOpacity, Image } from "react-native";
+import { View, Text, TouchableOpacity, Image, Pressable } from "react-native";
 import React, { useState, useEffect } from "react";
 
 import Logo from "../../components/Logo";
 import * as ImagePicker from "expo-image-picker"; // Import ImagePicker
 import * as FileSystem from "expo-file-system"; // Import FileSystem
 import { detectObjects } from "../api/detection"; // Import detectObjects api
+import WordCard from "../../components/WordCard"; // 引入 WordCard 组件
 
 const MainScreen = () => {
   const [imageUri, setImageUri] = useState(null); // State to store the image URI
@@ -19,23 +20,7 @@ const MainScreen = () => {
     width: 0,
     height: 0,
   });
-
-  useEffect(() => {
-    async function fetchTranslation() {
-      try {
-        const result = await translate("Hello, world!");
-        if (result) {
-          setTranslation(result);
-        } else {
-          setError("Translation failed");
-        }
-      } catch (err) {
-        setError("Error: " + err.message);
-      }
-    }
-
-    fetchTranslation();
-  }, []);
+  const [selectedWord, setSelectedWord] = useState(null); // 用于存储选中的单词
 
   // 上传图片
   const handleUpload = async () => {
@@ -92,20 +77,63 @@ const MainScreen = () => {
 
   // 拍照
   const handleTakePhoto = async () => {
-    const result = await ImagePicker.launchCameraAsync();
+    // 请求相机权限
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      alert('Permission to access camera is required!');
+      return;
+    }
+    
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: false,
+      quality: 1,
+    });
+    
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const capturedAsset = result.assets[0];
       console.log("Captured image URI:", capturedAsset.uri);
       setImageUri(capturedAsset.uri);
-      if (capturedAsset.uri.startsWith("file://")) {
-        const base64 = await FileSystem.readAsStringAsync(capturedAsset.uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        const objects = await detectObjects(null, base64);
-        setDetectedObjects(objects);
+      
+      // 获取图像宽高
+      const { width, height } = await new Promise((resolve) => {
+        Image.getSize(capturedAsset.uri, (width, height) =>
+          resolve({ width, height })
+        );
+      });
+
+      // 根据容器尺寸和原图宽高计算显示尺寸
+      const containerWidth = containerDimensions.width;
+      const containerHeight = containerDimensions.height;
+      const aspectRatio = width / height;
+      let newWidth, newHeight;
+      
+      if (containerWidth / containerHeight > aspectRatio) {
+        newHeight = containerHeight;
+        newWidth = containerHeight * aspectRatio;
       } else {
-        const objects = await detectObjects(capturedAsset.uri);
+        newWidth = containerWidth;
+        newHeight = containerWidth / aspectRatio;
+      }
+      
+      const top = (containerHeight - newHeight) / 2;
+      const left = (containerWidth - newWidth) / 2;
+      setImagePosition({ top, left, width: newWidth, height: newHeight });
+
+      // 调用检测 API
+      try {
+        let objects;
+        if (capturedAsset.uri.startsWith("file://")) {
+          const base64 = await FileSystem.readAsStringAsync(capturedAsset.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          objects = await detectObjects(null, base64);
+        } else {
+          objects = await detectObjects(capturedAsset.uri);
+        }
         setDetectedObjects(objects);
+      } catch (error) {
+        console.error("Object detection error:", error);
+        alert("Failed to detect objects in the image");
       }
     }
   };
@@ -189,12 +217,13 @@ const MainScreen = () => {
                 }}
               />
               {/* 文字容器 */}
-              <View
+              <TouchableOpacity
                 className="absolute bg-[#FF914D] rounded p-1.5 z-30 py-1"
                 style={{ top: labelTop, left: labelLeft }}
+                onPress={() => setSelectedWord(obj.name)} // 点击单词时设置选中的单词
               >
                 <Text className="text-white">{obj.name}</Text>
-              </View>
+              </TouchableOpacity>
             </React.Fragment>
           );
         })}
@@ -221,6 +250,35 @@ const MainScreen = () => {
           <Text className="text-white">❤️</Text>
         </TouchableOpacity>
       </View>
+
+      {/* 显示 WordCard 弹窗 */}
+      {selectedWord && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <WordCard
+            wordName={selectedWord}
+            wordDetail={{
+              phonetic: "/example/",
+              definitions: [
+                { definition: "Example definition 1", example: "Example usage 1" },
+                { definition: "Example definition 2", example: "Example usage 2" },
+              ]
+            }}
+            onClose={() => setSelectedWord(null)}
+          />
+        </View>
+      )}
     </View>
   );
 };
