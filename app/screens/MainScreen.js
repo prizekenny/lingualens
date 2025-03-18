@@ -247,18 +247,6 @@ const MainScreen = () => {
         >
           <Text className="text-white">Take Photo</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => {}}
-          className="p-2.5 bg-[#FF914D] rounded"
-        >
-          <Text className="text-white">❤️</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => router.push("/screens/SettingsScreen")}
-          className="p-2.5 bg-[#FF914D] rounded" //
-        >
-          <Text className="text-white">⚙️</Text>
-        </TouchableOpacity>
       </View>
 
       {/* 显示 WordCard 弹窗 */}

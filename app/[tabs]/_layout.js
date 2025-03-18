@@ -41,7 +41,7 @@ export default function Layout() {
           ),
         }}
       />
-      <Tabs.Screen
+      {/* <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
@@ -49,7 +49,17 @@ export default function Layout() {
             <Ionicons name="person-outline" color={color} size={size} />
           ),
         }}
+      /> */}
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" color={color} size={size} />
+          ),
+        }}
       />
+
       {/* Hide MusicScreen from Tab Bar */}
       <Tabs.Screen
         name="screens/MusicScreen"
