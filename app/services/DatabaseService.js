@@ -47,7 +47,6 @@ const getDatabase = async () => {
     console.log("📌 [DEBUG]数据库, ", db);
     return db;
   }
-  console.log("📌 [DEBUG]数据库已初始化: ", db);
   return db;
 };
 
@@ -118,15 +117,20 @@ export const addFavorite = async (favorite) => {
       console.log("🎉 添加收藏成功:", word);
     }
 
+    console.log("📌 [DEBUG] 处理 definitions 数量:", definitions.length);
     // 4️⃣ **处理 `definitions`**
     for (const def of definitions) {
-      if (!def.definition) continue; // 确保定义不为空
+      console.log("📌 [DEBUG] 处理 definition:", def);
+
+      if (!def.original) continue; // **确保定义不为空**
 
       // 检查 `definition` 是否已存在
       const existingDef = await db.getFirstAsync(
         "SELECT id FROM definitions WHERE favorite_id = ? AND definition = ?",
-        [favoriteId, def.definition.trim()]
+        [favoriteId, def.original.trim()] // **这里用 original 代替 definition**
       );
+
+      console.log("📌 [DEBUG] 处理 definition exist?:", existingDef);
 
       if (!existingDef) {
         // 插入 `definition`
@@ -134,17 +138,15 @@ export const addFavorite = async (favorite) => {
           "INSERT INTO definitions (favorite_id, definition, translation, example, exampleTranslation) VALUES (?, ?, ?, ?, ?)",
           [
             favoriteId,
-            def.definition.trim() || "",
-            def.translation.trim() || "",
+            def.original.trim() || "", // **用 original 代替 definition**
+            def.translated.trim() || "", // **用 translated 代替 translation**
             def.example.trim() || "",
-            def.exampleTranslation.trim() || "",
+            def.exampleTranslation?.trim() || "",
           ]
         );
-        console.log(`✅ 新定义插入: ${def.definition.substring(0, 30)}...`);
+        console.log(`✅ 新定义插入: ${def.original.substring(0, 30)}...`);
       } else {
-        console.log(
-          `⚠️ 定义已存在，跳过: ${def.definition.substring(0, 30)}...`
-        );
+        console.log(`⚠️ 定义已存在，跳过: ${def.original.substring(0, 30)}...`);
       }
     }
   } catch (error) {
