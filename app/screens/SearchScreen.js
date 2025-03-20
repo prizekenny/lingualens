@@ -15,6 +15,7 @@ const SearchScreen = () => {
   const [translatedQuery, setTranslatedQuery] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [phonetic, setPhonetic] = useState(""); // Add state for phonetic
 
   const handleTranslate = async () => {
     if (searchQuery.trim() === "") return;
@@ -25,6 +26,9 @@ const SearchScreen = () => {
 
     try {
       const wordDetails = await fetchWordDetails(searchQuery);
+
+      // 添加保存音标
+      setPhonetic(wordDetails.phonetic || "");
 
       // 添加延迟功能以避免API限流
       const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -39,7 +43,7 @@ const SearchScreen = () => {
             translated: translatedText,
             example: def.example,
           });
-          await delay(10);
+          await delay(50);
         } catch (translationError) {
           // 翻译失败时不显示错误，使用原文或占位符
           console.log("Translation error:", translationError.message);
@@ -122,6 +126,13 @@ const SearchScreen = () => {
 
         {translatedQuery.length > 0 && (
           <View className="mt-5 pb-10">
+            {/* 显示音标 */}
+            {phonetic && (
+              <Text className="text-sm text-gray-500 mb-3">
+                {searchQuery} {phonetic}
+              </Text>
+            )}
+
             {translatedQuery.map((item, index) => (
               <View key={index} className="mb-6">
                 <Text className="text-sm text-gray-800">
