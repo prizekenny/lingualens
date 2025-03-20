@@ -1,43 +1,129 @@
-import React from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useTranslate } from "../app/api/translate";
+import { useLanguage } from "../app/context/LanguageProvider";
+import { useFavorites } from "../app/context/FavoritesProvider";
+import { fetchWordDetails } from "../app/api/dictionary";
 
-const WordCard = ({ wordName, wordDetail = {}, onClose }) => {
-  // 设置默认值，防止 wordDetail 为空时出错
-  const { phonetic = "", definitions = [] } = wordDetail;
-  
+const WordCard = ({ wordName, onClose }) => {
+  const { translateText } = useTranslate();
+  const { language } = useLanguage();
+  const { toggleFavorite, isFavoriteExist, favorites } = useFavorites();
+
+  const [translatedWord, setTranslatedWord] = useState("");
+  const [wordDetails, setWordDetails] = useState(null);
+  const [exampleTranslation, setExampleTranslation] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [isFavorited, setIsFavorited] = useState(false);
+
+  useEffect(() => {
+    const loadWordData = async () => {
+      setLoading(true);
+      try {
+        const details = await fetchWordDetails(wordName);
+        setWordDetails(details);
+        const translated = await translateText(wordName);
+        setTranslatedWord(translated);
+
+        if (details.definitions[0]?.example) {
+          const exampleTranslated = await translateText(
+            details.definitions[0].example
+          );
+          setExampleTranslation(exampleTranslated);
+        } else {
+          setExampleTranslation("");
+        }
+      } catch (error) {
+        setWordDetails({
+          phonetic: "",
+          definitions: [{ definition: "No definition found.", example: "" }],
+        });
+        setExampleTranslation("");
+      }
+
+      setIsFavorited(isFavoriteExist({ word: wordName }));
+      setLoading(false);
+    };
+
+    loadWordData();
+  }, [wordName, language, favorites]);
+
+  const handleToggleFavorite = async () => {
+    try {
+      await toggleFavorite({
+        word: wordName,
+        translation: translatedWord,
+        example: wordDetails?.definitions[0]?.example || "",
+        exampleTranslation,
+      });
+
+      const nowFavorite = isFavoriteExist({ word: wordName });
+      setIsFavorited(nowFavorite);
+      Alert.alert(
+        nowFavorite ? "Added to favorites!" : "Removed from favorites"
+      );
+    } catch (err) {
+      console.error("Toggle favorite failed:", err);
+      Alert.alert("Error", "Could not toggle favorite. Please try again.");
+    }
+  };
+
   return (
     <View
       style={{
-        width: '90%', // 屏幕宽度的90%
-        backgroundColor: '#1F2937',
+        width: "90%",
+        backgroundColor: "#1F2937",
         borderRadius: 12,
         padding: 24,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        elevation: 5,
       }}
     >
-      <Text className="text-white text-2xl font-bold mb-2">{wordName}</Text>
-      {phonetic && (
-        <Text className="text-gray-400 text-lg mb-4">{phonetic}</Text>
-      )}
-
-      <View>
-        {definitions.map((def, index) => (
-          <View key={index} className="mb-4">
-            <Text className="text-white text-base">
-              {index + 1}. {def.definition}
-            </Text>
-            {def.example && (
-              <Text className="text-gray-400 text-sm mt-1">
-                Example: {def.example}
-              </Text>
-            )}
-          </View>
-        ))}
+      <View className="flex-row items-center justify-between mb-4">
+        <Text className="text-white text-2xl font-bold">
+          {wordName} <Text className="text-orange-400">{translatedWord}</Text>
+        </Text>
+        <TouchableOpacity onPress={handleToggleFavorite}>
+          <Ionicons
+            name={isFavorited ? "heart" : "heart-outline"}
+            size={28}
+            color="orange"
+          />
+        </TouchableOpacity>
       </View>
+
+      {wordDetails?.phonetic ? (
+        <Text className="text-gray-400 text-lg mb-4">
+          {wordDetails.phonetic}
+        </Text>
+      ) : null}
+
+      {loading ? (
+        <ActivityIndicator color="orange" />
+      ) : (
+        <View>
+          <Text className="text-white text-base mb-2">
+            {wordDetails?.definitions[0]?.definition || "No definition."}
+          </Text>
+          {wordDetails?.definitions[0]?.example ? (
+            <>
+              <Text className="text-gray-400 text-sm">
+                Example: {wordDetails.definitions[0].example}
+              </Text>
+              <Text className="text-orange-400 text-sm mt-1">
+                {exampleTranslation}
+              </Text>
+            </>
+          ) : (
+            <Text className="text-gray-400 text-sm">No example available.</Text>
+          )}
+        </View>
+      )}
 
       <TouchableOpacity
         onPress={onClose}

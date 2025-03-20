@@ -1,17 +1,16 @@
-import { View, Text, TouchableOpacity, Image, Pressable } from "react-native";
+import { View, Text, TouchableOpacity, Image } from "react-native";
 import React, { useState, useEffect } from "react";
-
 import Logo from "../../components/Logo";
-import * as ImagePicker from "expo-image-picker"; // Import ImagePicker
-import * as FileSystem from "expo-file-system"; // Import FileSystem
-import { detectObjects } from "../api/detection"; // Import detectObjects api
-import WordCard from "../../components/WordCard"; // 引入 WordCard 组件
-// 导入数据库相关操作
-import { imageOperations, detectionOperations } from "../database/wordRepository";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
+import { detectObjects } from "../api/detection";
+import WordCard from "../../components/WordCard";
+import { useRouter } from "expo-router";
 
 const MainScreen = () => {
-  const [imageUri, setImageUri] = useState(null); // State to store the image URI
-  const [detectedObjects, setDetectedObjects] = useState([]); // 存储检测到的物体
+  const router = useRouter();
+  const [imageUri, setImageUri] = useState(null);
+  const [detectedObjects, setDetectedObjects] = useState([]);
   const [containerDimensions, setContainerDimensions] = useState({
     width: 0,
     height: 0,
@@ -22,33 +21,8 @@ const MainScreen = () => {
     width: 0,
     height: 0,
   });
-  const [selectedWord, setSelectedWord] = useState(null); // 用于存储选中的单词
-  // 添加保存图片ID的状态
-  const [savedImageId, setSavedImageId] = useState(null);
-  // 使用临时用户ID，实际应用中应从认证或上下文中获取
-  const userId = 1;
+  const [selectedWord, setSelectedWord] = useState(null);
 
-  // 保存检测到的对象到数据库
-  const saveDetectedObjects = async (imageId, objects) => {
-    try {
-      // 批量保存识别到的对象
-      await detectionOperations.saveMultipleDetections(
-        userId, 
-        imageId, 
-        objects.map(obj => ({
-          name: obj.name,
-          value: obj.value,
-          boundingBox: obj.boundingBox,
-          translation: obj.translated // 假设API返回的对象可能有翻译
-        }))
-      );
-      console.log("保存检测对象成功");
-    } catch (error) {
-      console.error("保存检测对象失败:", error);
-    }
-  };
-
-  // 上传图片
   const handleUpload = async () => {
     const permissionResult =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -57,19 +31,16 @@ const MainScreen = () => {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync();
-    console.log("Image picker result:", result);
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const selectedAsset = result.assets[0];
-      console.log("Selected image URI:", selectedAsset.uri);
       setImageUri(selectedAsset.uri);
-      // 获取图像宽高
+
       const { width, height } = await new Promise((resolve) => {
         Image.getSize(selectedAsset.uri, (width, height) =>
           resolve({ width, height })
         );
       });
 
-      // 根据容器尺寸和原图宽高计算显示尺寸
       const containerWidth = containerDimensions.width;
       const containerHeight = containerDimensions.height;
       const aspectRatio = width / height;
@@ -85,72 +56,45 @@ const MainScreen = () => {
       const left = (containerWidth - newWidth) / 2;
       setImagePosition({ top, left, width: newWidth, height: newHeight });
 
-      // 保存图片到数据库
-      try {
-        const imageId = await imageOperations.saveImage(
-          userId,
-          selectedAsset.uri,
-          'upload_' + new Date().getTime(),
-          null,
-          width,
-          height
-        );
-        setSavedImageId(imageId);
-        
-        // 调用检测 API
-        let objects;
-        if (selectedAsset.uri.startsWith("file://")) {
-          const base64 = await FileSystem.readAsStringAsync(selectedAsset.uri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-          objects = await detectObjects(null, base64);
-        } else {
-          objects = await detectObjects(selectedAsset.uri);
-        }
-        setDetectedObjects(objects);
-        
-        // 保存检测结果到数据库
-        await saveDetectedObjects(imageId, objects);
-      } catch (error) {
-        console.error("处理图片失败:", error);
+      // 下面的代码替换了！
+      let objects;
+      if (selectedAsset.uri.startsWith("file://")) {
+        const base64 = await FileSystem.readAsStringAsync(selectedAsset.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        objects = await detectObjects(null, base64);
+      } else {
+        objects = await detectObjects(selectedAsset.uri);
       }
-    } else {
-      console.log("Image selection was cancelled or no assets found.");
+
+      setDetectedObjects(objects);
     }
   };
 
-  // 拍照
   const handleTakePhoto = async () => {
-    // 请求相机权限
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      alert('Permission to access camera is required!');
+    if (status !== "granted") {
+      alert("Permission to access camera is required!");
       return;
     }
-    
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: false,
       quality: 1,
     });
-    
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const capturedAsset = result.assets[0];
-      console.log("Captured image URI:", capturedAsset.uri);
       setImageUri(capturedAsset.uri);
-      
-      // 获取图像宽高
+
       const { width, height } = await new Promise((resolve) => {
         Image.getSize(capturedAsset.uri, (width, height) =>
           resolve({ width, height })
         );
       });
 
-      // 根据容器尺寸和原图宽高计算显示尺寸
       const containerWidth = containerDimensions.width;
       const containerHeight = containerDimensions.height;
       const aspectRatio = width / height;
       let newWidth, newHeight;
-      
       if (containerWidth / containerHeight > aspectRatio) {
         newHeight = containerHeight;
         newWidth = containerHeight * aspectRatio;
@@ -158,45 +102,25 @@ const MainScreen = () => {
         newWidth = containerWidth;
         newHeight = containerWidth / aspectRatio;
       }
-      
       const top = (containerHeight - newHeight) / 2;
       const left = (containerWidth - newWidth) / 2;
       setImagePosition({ top, left, width: newWidth, height: newHeight });
 
-      // 保存图片到数据库
-      try {
-        const imageId = await imageOperations.saveImage(
-          userId,
-          capturedAsset.uri,
-          'camera_' + new Date().getTime(),
-          null,
-          width,
-          height
-        );
-        setSavedImageId(imageId);
-
-        // 调用检测 API
-        let objects;
-        if (capturedAsset.uri.startsWith("file://")) {
-          const base64 = await FileSystem.readAsStringAsync(capturedAsset.uri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-          objects = await detectObjects(null, base64);
-        } else {
-          objects = await detectObjects(capturedAsset.uri);
-        }
-        setDetectedObjects(objects);
-        
-        // 保存检测结果到数据库
-        await saveDetectedObjects(imageId, objects);
-      } catch (error) {
-        console.error("Object detection error:", error);
-        alert("Failed to detect objects in the image");
+      // 下面的代码替换了！
+      let objects;
+      if (capturedAsset.uri.startsWith("file://")) {
+        const base64 = await FileSystem.readAsStringAsync(capturedAsset.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        objects = await detectObjects(null, base64);
+      } else {
+        objects = await detectObjects(capturedAsset.uri);
       }
+
+      setDetectedObjects(objects);
     }
   };
 
-  // 筛选同名物体中值最大的三个
   const getTopObjects = (objects) => {
     const objectMap = {};
     objects.forEach((obj) => {
@@ -215,41 +139,12 @@ const MainScreen = () => {
 
   const topObjects = getTopObjects(detectedObjects);
 
-  // 获取单词详情
-  const getWordDetail = async (word) => {
-    try {
-      // 查询单词是否已存在于数据库
-      const { exists, wordId, isFavorite } = await detectionOperations.wordOperations.checkWordFavoriteStatus(userId, word);
-      
-      if (exists) {
-        // 如果单词存在，获取详细信息
-        return await detectionOperations.wordCardOperations.getWordDetailsForCard(wordId);
-      } else {
-        // 单词不存在，返回基本信息
-        return {
-          phonetic: "",
-          definitions: [
-            { definition: "查看单词详情" }
-          ]
-        };
-      }
-    } catch (error) {
-      console.error("获取单词详情失败:", error);
-      return {
-        phonetic: "",
-        definitions: [
-          { definition: "无法获取单词详情" }
-        ]
-      };
-    }
-  };
-
   return (
     <View className="bg-background flex-1 flex-col mt-12">
       <View className="items-center">
         <Logo imageSize={80} fontSize={30} />
       </View>
-      {/* 图片容器 */}
+
       <View
         className="flex-1 bg-gray-500 justify-center items-center overflow-hidden relative mb-5"
         onLayout={(event) => {
@@ -272,7 +167,6 @@ const MainScreen = () => {
         />
 
         {topObjects.map((obj, index) => {
-          // 计算绿框位置和尺寸（基于归一化坐标）
           const posX =
             obj.boundingBox.left * imagePosition.width + imagePosition.left;
           const posY =
@@ -284,16 +178,8 @@ const MainScreen = () => {
             (obj.boundingBox.bottom - obj.boundingBox.top) *
             imagePosition.height;
 
-          // 这里示例中暂时将 label 放在绿框正上方（posY - 30）；
-          // 后续可根据文字动态尺寸和边界进行调整
-          let labelTop = posY - 30;
-          let labelLeft = posX;
-
-          // 可在此处加入更多判断（例如：超出右边界、上边界等）动态调整 labelTop/labelLeft
-
           return (
             <React.Fragment key={index}>
-              {/* 绿框 */}
               <View
                 className="absolute border-2 border-green-500 z-20"
                 style={{
@@ -303,11 +189,10 @@ const MainScreen = () => {
                   height: boxHeight,
                 }}
               />
-              {/* 文字容器 */}
               <TouchableOpacity
                 className="absolute bg-[#FF914D] rounded p-1.5 z-30 py-1"
-                style={{ top: labelTop, left: labelLeft }}
-                onPress={() => setSelectedWord(obj.name)} // 点击单词时设置选中的单词
+                style={{ top: posY - 30, left: posX }}
+                onPress={() => setSelectedWord(obj)}
               >
                 <Text className="text-white">{obj.name}</Text>
               </TouchableOpacity>
@@ -316,7 +201,6 @@ const MainScreen = () => {
         })}
       </View>
 
-      {/* 按钮区域 */}
       <View className="flex-row justify-around pb-5">
         <TouchableOpacity
           onPress={handleUpload}
@@ -330,38 +214,24 @@ const MainScreen = () => {
         >
           <Text className="text-white">Take Photo</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => {}}
-          className="p-2.5 bg-[#FF914D] rounded"
-        >
-          <Text className="text-white">❤️</Text>
-        </TouchableOpacity>
       </View>
 
-      {/* 显示 WordCard 弹窗 */}
       {selectedWord && (
         <View
           style={{
-            position: 'absolute',
+            position: "absolute",
             top: 0,
             bottom: 0,
             left: 0,
             right: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            justifyContent: 'center',
-            alignItems: 'center',
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
             zIndex: 1000,
           }}
         >
           <WordCard
-            wordName={selectedWord}
-            wordDetail={{
-              phonetic: "/example/",
-              definitions: [
-                { definition: "Example definition 1", example: "Example usage 1" },
-                { definition: "Example definition 2", example: "Example usage 2" },
-              ]
-            }}
+            wordName={selectedWord.name}
             onClose={() => setSelectedWord(null)}
           />
         </View>

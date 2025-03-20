@@ -1,119 +1,138 @@
-import { View, Text, ScrollView, TouchableOpacity } from "react-native";
-import React, { useState } from "react";
-import { Ionicons } from "@expo/vector-icons";
-import PlaylistItem from "../../components/PlayListItem";
-import { useRouter } from "expo-router";
-import { useTracks } from "../context/TrackProvider";
-import NowPlaying from "../../components/NowPlaying";
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  ActivityIndicator,
+  TouchableOpacity,
+  Alert,
+} from "react-native";
+import { useFavorites } from "../context/FavoritesProvider";
+import { useTranslate } from "../api/translate";
+import { useLanguage } from "../context/LanguageProvider";
+import { deleteFavorite } from "../api/favorites"; // ⬅ 一定要引入删除API
 
 const FavListScreen = () => {
-  const [isRandom, setIsRandom] = useState(false);
-  const router = useRouter();
-  const { tracks, setPlayingTrack, updateTrack } = useTracks();
+  const { favorites, refreshFavorites } = useFavorites(); // ⬅ 注意这里多了个refreshFavorites
+  const { translateText } = useTranslate();
+  const { language } = useLanguage();
+  const [translatedFavorites, setTranslatedFavorites] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Get favorite tracks
-  const favoriteTracks = tracks.filter(track => track.favorite);
+  useEffect(() => {
+    const processFavorites = async () => {
+      setLoading(true);
 
-  // Handle play
-  const handlePlay = (track) => {
-    setPlayingTrack(track);
-    router.push("/music");
-  };
+      const translations = await Promise.all(
+        favorites.map(async (fav) => {
+          if (fav.translation && fav.exampleTranslation) {
+            return { ...fav };
+          }
+          try {
+            const [translatedWord, translatedExample] = await Promise.all([
+              translateText(fav.word),
+              translateText(fav.example || ""),
+            ]);
+            return {
+              ...fav,
+              translation: translatedWord,
+              exampleTranslation: translatedExample,
+            };
+          } catch (err) {
+            console.error("Translation failed for:", fav.word, err);
+            return {
+              ...fav,
+              translation: "Translation failed",
+              exampleTranslation: "",
+            };
+          }
+        })
+      );
 
-  // Toggle favorite status
-  const handleToggleFavorite = async (id) => {
-    const updatedTrack = tracks.find((track) => track.id === id);
-    if (updatedTrack) {
-      updateTrack(id, { favorite: !updatedTrack.favorite });
+      setTranslatedFavorites(translations);
+      setLoading(false);
+    };
+
+    if (favorites.length > 0) {
+      processFavorites();
+    } else {
+      setTranslatedFavorites([]);
+      setLoading(false);
     }
-  };
+  }, [favorites, language]);
 
-  // Play all tracks
-  const handlePlayAll = () => {
-    if (favoriteTracks.length > 0) {
-      const trackToPlay = isRandom 
-        ? favoriteTracks[Math.floor(Math.random() * favoriteTracks.length)]
-        : favoriteTracks[0];
-      handlePlay(trackToPlay);
-    }
-  };
-
-  // Toggle random state
-  const toggleRandom = () => {
-    setIsRandom(!isRandom);
+  const handleDelete = async (id) => {
+    Alert.alert(
+      "Delete Favorite",
+      "Are you sure you want to delete this favorite?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteFavorite(id);
+              await refreshFavorites(); // 删除后刷新列表
+            } catch (err) {
+              console.error("Failed to delete favorite:", err);
+              Alert.alert(
+                "Error",
+                "Could not delete favorite. Please try again."
+              );
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
-    <View className="bg-background flex-1 flex-col px-5 pt-8">
-      {/* Header */}
-      <View className="flex-row items-center justify-between mb-6">
-        <Text className="text-2xl font-bold text-textPrimary">Favorite Songs</Text>
-        <Text className="text-gray-500">{favoriteTracks.length} songs</Text>
-      </View>
-
-      {/* Play Controls */}
-      <View className="flex-row items-center justify-between bg-white rounded-xl p-4 mb-6 shadow-sm">
-        <TouchableOpacity 
-          onPress={handlePlayAll}
-          className="flex-row items-center"
-        >
-          <Ionicons name="play-circle" size={32} color="#4CAF50" />
-          <Text className="ml-2 text-lg font-semibold text-textPrimary">
-            Play All
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          onPress={toggleRandom}
-          className="flex-row items-center"
-        >
-          <Ionicons 
-            name={isRandom ? "shuffle" : "shuffle-outline"} 
-            size={24} 
-            color={isRandom ? "#4CAF50" : "#666"} 
-          />
-          <Text className={`ml-1 ${isRandom ? "text-green-600" : "text-gray-600"}`}>
-            Random
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Playlist */}
-      <ScrollView
-        showsVerticalScrollIndicator={true}
-        keyboardShouldPersistTaps="handled"
-        nestedScrollEnabled={true}
-        className="gap-2 pb-24"
-      >
-        {favoriteTracks.length === 0 ? (
-          <Text className="text-center text-gray-500 mt-10">
-            No favorite songs yet
-          </Text>
-        ) : (
-          favoriteTracks.map((track) => (
-            <View key={track.id}>
-              <PlaylistItem
-                id={track.id}
-                name={track.name}
-                artist={track.artist}
-                duration={track.duration}
-                favorite={track.favorite}
-                onPlay={() => handlePlay(track)}
-                onToggleFavorite={() => handleToggleFavorite(track.id)}
-                onArtistPress={() => router.push({
-                  pathname: "/artist/[name]",
-                  params: { name: track.artist }
-                })}
-              />
+    <View className="flex-1 px-4 pt-14 bg-white">
+      <Text className="text-2xl font-bold mb-4">Favorites</Text>
+      {loading ? (
+        <View className="flex-1 justify-center items-center mt-5">
+          <ActivityIndicator size="large" color="#FF914D" />
+          <Text className="text-gray-500 mt-2">Loading translations...</Text>
+        </View>
+      ) : translatedFavorites.length === 0 ? (
+        <Text className="text-gray-500 text-center mt-10">
+          No favorites yet.
+        </Text>
+      ) : (
+        <ScrollView>
+          {translatedFavorites.map((item, index) => (
+            <View
+              key={item.id || index}
+              className="mb-6 border-b border-gray-200 pb-4"
+            >
+              <View className="flex-row justify-between items-center">
+                <Text className="text-lg font-semibold text-gray-900">
+                  {index + 1}. {item.word}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => handleDelete(item.id)}
+                  className="bg-red-500 px-2 py-1 rounded"
+                >
+                  <Text className="text-white">Delete</Text>
+                </TouchableOpacity>
+              </View>
+              <Text className="text-orange-500 text-base mt-1">
+                {item.translation}
+              </Text>
+              <Text className="text-gray-500 text-sm mt-2">Example:</Text>
+              <Text className="text-gray-600 text-sm mt-1 italic">
+                {item.example || "No example available."}
+              </Text>
+              {item.exampleTranslation && (
+                <Text className="text-orange-400 text-sm mt-1">
+                  {item.exampleTranslation}
+                </Text>
+              )}
             </View>
-          ))
-        )}
-      </ScrollView>
-
-      {/* Now Playing */}
-      <View>
-        <NowPlaying />
-      </View>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 };
