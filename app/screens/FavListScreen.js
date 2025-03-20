@@ -7,13 +7,10 @@ import {
   TouchableOpacity,
   Alert,
 } from "react-native";
-import { useFavorites } from "../context/FavoritesProvider";
 import { useTranslate } from "../api/translate";
 import { useLanguage } from "../context/LanguageProvider";
-import { deleteFavorite } from "../api/favorites"; // ⬅ 一定要引入删除API
 
 const FavListScreen = () => {
-  const { favorites, refreshFavorites } = useFavorites(); // ⬅ 注意这里多了个refreshFavorites
   const { translateText } = useTranslate();
   const { language } = useLanguage();
   const [translatedFavorites, setTranslatedFavorites] = useState([]);

@@ -43,7 +43,7 @@ const SearchScreen = () => {
             translated: translatedText,
             example: def.example,
           });
-          await delay(50);
+          await delay(500);
         } catch (translationError) {
           // 翻译失败时不显示错误，使用原文或占位符
           console.log("Translation error:", translationError.message);

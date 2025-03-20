@@ -1,6 +1,5 @@
 import { Stack } from "expo-router";
 import { NativeWindStyleSheet } from "nativewind";
-import { FavoritesProvider } from "./context/FavoritesProvider";
 import { LanguageProvider } from "./context/LanguageProvider";
 
 export default function Layout() {
@@ -8,11 +7,9 @@ export default function Layout() {
 
   return (
     <LanguageProvider>
-      <FavoritesProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="[tabs]" options={{ headerShown: false }} />
-        </Stack>
-      </FavoritesProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="[tabs]" options={{ headerShown: false }} />
+      </Stack>
     </LanguageProvider>
   );
 }
