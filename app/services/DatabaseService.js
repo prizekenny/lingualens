@@ -220,10 +220,33 @@ export const getAllFavorites = async () => {
   }
 };
 
+export const getFavoriteByWord = async (word) => {
+  const db = await getDatabase();
+  try {
+    const favorite = await db.getFirstAsync(
+      "SELECT * FROM favorites WHERE word = ?",
+      [word]
+    );
+    if (!favorite) return null;
+
+    // 获取所有定义
+    const definitions = await db.getAllAsync(
+      "SELECT definition, translation, example, exampleTranslation FROM definitions WHERE favorite_id = ?",
+      [favorite.id]
+    );
+
+    return { ...favorite, definitions };
+  } catch (error) {
+    console.error("❌ 获取收藏数据失败:", error);
+    return null;
+  }
+};
+
 // ✅ 默认导出
 export default {
   addFavorite,
   removeFavorite,
   isFavorite,
   getAllFavorites,
+  getFavoriteByWord,
 };

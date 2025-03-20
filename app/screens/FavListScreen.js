@@ -102,7 +102,7 @@ const FavListScreen = () => {
                 {/* 删除按钮 */}
                 <TouchableOpacity
                   onPress={() => handleDelete(item.word)}
-                  className="bg-red-500 px-2 py-1 rounded"
+                  className="bg-red-500 px-2 py-1 rounded-lg"
                 >
                   <Text className="text-white">Delete</Text>
                 </TouchableOpacity>

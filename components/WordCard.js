@@ -8,13 +8,14 @@ import {
   ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { translate } from "../app/api/translate"; // 直接导入 translate 函数
 import { useLanguage } from "../app/context/LanguageProvider";
+import { translate } from "../app/api/translate";
 import { fetchWordDetails } from "../app/api/dictionary";
 import {
   isFavorite,
   addFavorite,
   removeFavorite,
+  getFavoriteByWord, // ✅ 从数据库获取单词
 } from "../app/services/DatabaseService";
 
 const WordCard = ({ wordName, onClose }) => {
@@ -30,68 +31,89 @@ const WordCard = ({ wordName, onClose }) => {
     const loadWordData = async () => {
       setLoading(true);
       try {
-        const details = await fetchWordDetails(wordName);
-        setWordDetails(details);
+        console.log(`📌 检查 "${wordName}" 是否在数据库中`);
 
-        const translated = await translate(wordName);
-        setTranslatedWord(translated);
+        let details = await getFavoriteByWord(wordName); // ✅ 先从数据库查询
+        if (details) {
+          console.log("📌 从数据库获取:", details);
+          setTranslatedWord(details.translation || ""); // ✅ 直接使用数据库翻译
 
-        const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-        const defs = [];
-        if (details?.definitions?.length > 0) {
-          console.log("开始翻译定义, 数量:", details.definitions.length);
-          for (const def of details.definitions) {
-            try {
-              await delay(500);
-              const translatedText = await translate(def.definition);
-              defs.push({
-                original: def.definition,
-                translated: translatedText,
-                example: def.example || "",
-              });
-            } catch (err) {
-              console.error("Translation error:", err.message);
-              defs.push({
-                original: def.definition,
-                translated: "Translation unavailable",
-                example: def.example || "",
-              });
-            }
-          }
+          // ✅ 确保 definitions 格式正确
+          setTranslatedDefinitions(
+            details.definitions.map((def) => ({
+              original: def.definition,
+              translated: def.translation || "Translation unavailable",
+              example: def.example || "",
+              exampleTranslation: def.exampleTranslation || "",
+            }))
+          );
         } else {
-          defs.push({
-            original: "No definition available",
-            translated: "无可用定义",
-            example: "",
-          });
+          console.log(`📌 "${wordName}" 不在数据库中，使用 API 获取`);
+          details = await fetchWordDetails(wordName); // ❌ 不在数据库里，就从 API 获取
+
+          // ✅ 翻译单词
+          const translated = await translate(wordName);
+          setTranslatedWord(translated);
+
+          // ✅ 翻译所有定义
+          const delay = (ms) =>
+            new Promise((resolve) => setTimeout(resolve, ms));
+
+          const defs = [];
+          if (details?.definitions?.length > 0) {
+            for (const def of details.definitions) {
+              try {
+                await delay(500);
+                const translatedText = await translate(def.definition);
+                defs.push({
+                  original: def.definition,
+                  translated: translatedText,
+                  example: def.example || "",
+                });
+              } catch (err) {
+                console.error("Translation error:", err.message);
+                defs.push({
+                  original: def.definition,
+                  translated: "Translation unavailable",
+                  example: def.example || "",
+                });
+              }
+            }
+          } else {
+            defs.push({
+              original: "No definition available",
+              translated: "无可用定义",
+              example: "",
+            });
+          }
+
+          setTranslatedDefinitions(defs);
         }
 
-        console.log("设置翻译定义，数量:", defs.length);
-        setTranslatedDefinitions([...defs]); // 确保 React 监听状态更新
+        setWordDetails(details);
       } catch (error) {
-        console.error("Word details error:", error);
+        console.error("❌ 获取单词详情失败:", error);
         setWordDetails({
           phonetic: "",
           definitions: [{ definition: "No definition found.", example: "" }],
         });
         setTranslatedDefinitions([]);
       } finally {
-        setLoading(false); // **确保最终一定会执行**
+        setLoading(false);
       }
     };
 
     loadWordData();
   }, [wordName, language]);
 
-  // 组件初始化时检查收藏状态
+  // ✅ **每次打开 WordCard，都检查收藏状态**
   useEffect(() => {
     const checkFavoriteStatus = async () => {
       try {
         const favorited = await isFavorite(wordName);
         setIsFavorited(favorited);
       } catch (error) {
-        console.error("检查收藏状态失败:", error);
+        console.error("❌ 检查收藏状态失败:", error);
       }
     };
 
@@ -100,11 +122,11 @@ const WordCard = ({ wordName, onClose }) => {
     }
   }, [wordName]);
 
-  // 修改切换收藏状态函数
+  // ✅ **切换收藏状态**
   const handleToggleFavorite = async () => {
     if (!wordName || wordName.trim() === "") {
       Alert.alert("Error", "Invalid word name");
-      console.error("Error: wordName is empty or invalid.");
+      console.error("❌ Error: wordName is empty or invalid.");
       return;
     }
 
@@ -116,7 +138,6 @@ const WordCard = ({ wordName, onClose }) => {
         setIsFavorited(false);
         Alert.alert("Removed from favorites");
       } else {
-        // 确保 definitions 是数组
         const definitionsArray =
           translatedDefinitions.map((def) => ({
             definition: def.original || "",
@@ -134,7 +155,7 @@ const WordCard = ({ wordName, onClose }) => {
         Alert.alert("Added to favorites successfully!");
       }
     } catch (err) {
-      console.error("Toggle favorite failed:", err);
+      console.error("❌ 切换收藏状态失败:", err);
       Alert.alert("Error", "Could not toggle favorite. Please try again.");
     }
   };
@@ -173,11 +194,7 @@ const WordCard = ({ wordName, onClose }) => {
         <ActivityIndicator color="orange" />
       ) : (
         <View style={{ height: 400 }}>
-          {/* 添加固定高度容器 */}
-          <ScrollView
-            showsVerticalScrollIndicator={true}
-            contentContainerStyle={{ paddingBottom: 20 }}
-          >
+          <ScrollView showsVerticalScrollIndicator={true}>
             {translatedDefinitions.length > 0 ? (
               translatedDefinitions.map((item, index) => (
                 <View key={index} className="mb-5">
