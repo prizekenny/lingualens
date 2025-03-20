@@ -1,147 +1,129 @@
-import db from './db';
+import { getDatabase } from './db';
 
 // 搜索历史相关操作
 export const searchHistoryOperations = {
   // 添加搜索历史
-  addSearchHistory: (userId, word, definitions = null, phonetic = null) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'INSERT INTO search_history (user_id, word) VALUES (?, ?)',
-          [userId, word],
-          (_, result) => {
-            resolve(result.insertId);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
+  addSearchHistory: async (userId, word) => {
+    try {
+      const db = getDatabase();
+      const [result] = await db.executeSql(
+        'INSERT INTO search_history (user_id, word) VALUES (?, ?)',
+        [userId, word]
+      );
+      return result.insertId;
+    } catch (error) {
+      console.error("Error adding search history:", error);
+      throw error;
+    }
   },
 
   // 检查搜索历史是否存在
-  checkSearchHistory: (userId, word) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'SELECT * FROM search_history WHERE user_id = ? AND word = ?',
-          [userId, word],
-          (_, result) => {
-            resolve(result.rows.length > 0);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
+  checkSearchHistory: async (userId, word) => {
+    try {
+      const db = getDatabase();
+      const [result] = await db.executeSql(
+        'SELECT * FROM search_history WHERE user_id = ? AND word = ?',
+        [userId, word]
+      );
+      return result.rows.length > 0;
+    } catch (error) {
+      console.error("Error checking search history:", error);
+      throw error;
+    }
   },
 
   // 获取搜索历史
-  getSearchHistory: (userId, limit = 20) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'SELECT * FROM search_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
-          [userId, limit],
-          (_, result) => {
-            const history = [];
-            for (let i = 0; i < result.rows.length; i++) {
-              history.push(result.rows.item(i));
-            }
-            resolve(history);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
+  getSearchHistory: async (userId, limit = 20) => {
+    try {
+      const db = getDatabase();
+      const [result] = await db.executeSql(
+        'SELECT * FROM search_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
+        [userId, limit]
+      );
+      
+      const history = [];
+      for (let i = 0; i < result.rows.length; i++) {
+        history.push(result.rows.item(i));
+      }
+      return history;
+    } catch (error) {
+      console.error("Error getting search history:", error);
+      throw error;
+    }
   },
 
   // 获取最近搜索的单词（不重复）
-  getRecentUniqueSearches: (userId, limit = 10) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'SELECT word, MAX(created_at) as latest_search FROM search_history WHERE user_id = ? GROUP BY word ORDER BY latest_search DESC LIMIT ?',
-          [userId, limit],
-          (_, result) => {
-            const history = [];
-            for (let i = 0; i < result.rows.length; i++) {
-              history.push(result.rows.item(i));
-            }
-            resolve(history);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
+  getRecentUniqueSearches: async (userId, limit = 10) => {
+    try {
+      const db = getDatabase();
+      const [result] = await db.executeSql(
+        'SELECT word, MAX(created_at) as latest_search FROM search_history WHERE user_id = ? GROUP BY word ORDER BY latest_search DESC LIMIT ?',
+        [userId, limit]
+      );
+      
+      const history = [];
+      for (let i = 0; i < result.rows.length; i++) {
+        history.push(result.rows.item(i));
+      }
+      return history;
+    } catch (error) {
+      console.error("Error getting recent unique searches:", error);
+      throw error;
+    }
   },
 
   // 清除所有搜索历史
-  clearSearchHistory: (userId) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'DELETE FROM search_history WHERE user_id = ?',
-          [userId],
-          (_, result) => {
-            resolve(result.rowsAffected);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
+  clearSearchHistory: async (userId) => {
+    try {
+      const db = getDatabase();
+      const [result] = await db.executeSql(
+        'DELETE FROM search_history WHERE user_id = ?',
+        [userId]
+      );
+      return result.rowsAffected;
+    } catch (error) {
+      console.error("Error clearing search history:", error);
+      throw error;
+    }
   },
   
   // 删除特定的搜索记录
-  removeSearchItem: (searchId) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'DELETE FROM search_history WHERE id = ?',
-          [searchId],
-          (_, result) => {
-            resolve(result.rowsAffected);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
+  removeSearchItem: async (searchId) => {
+    try {
+      const db = getDatabase();
+      const [result] = await db.executeSql(
+        'DELETE FROM search_history WHERE id = ?',
+        [searchId]
+      );
+      return result.rowsAffected;
+    } catch (error) {
+      console.error("Error removing search item:", error);
+      throw error;
+    }
   },
   
   // 搜索单词
-  searchWords: (term) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          `SELECT DISTINCT word FROM 
-           (SELECT word FROM words WHERE word LIKE ? 
-            UNION 
-            SELECT word FROM search_history WHERE word LIKE ?) 
-           AS combined_search ORDER BY word`,
-          [`%${term}%`, `%${term}%`],
-          (_, result) => {
-            const words = [];
-            for (let i = 0; i < result.rows.length; i++) {
-              words.push(result.rows.item(i).word);
-            }
-            resolve(words);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
+  searchWords: async (term) => {
+    try {
+      const db = getDatabase();
+      const [result] = await db.executeSql(
+        `SELECT DISTINCT word FROM 
+         (SELECT word FROM words WHERE word LIKE ? 
+          UNION 
+          SELECT word FROM search_history WHERE word LIKE ?) 
+         AS combined_search ORDER BY word`,
+        [`%${term}%`, `%${term}%`]
+      );
+      
+      const words = [];
+      for (let i = 0; i < result.rows.length; i++) {
+        words.push(result.rows.item(i).word);
+      }
+      return words;
+    } catch (error) {
+      console.error("Error searching words:", error);
+      throw error;
+    }
   }
 };
 
