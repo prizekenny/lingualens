@@ -1,16 +1,41 @@
 import db from './db';
 
+// 默认用户ID，与 FavoritesProvider 保持一致
+const DEFAULT_USER_ID = "1";
+
 // 收藏单词相关操作
 export const favoriteWordOperations = {
   // 添加收藏单词
   addFavoriteWord: (userId, word, phonetic = null) => {
     return new Promise((resolve, reject) => {
       db.transaction(tx => {
+        // 先检查单词是否已存在
         tx.executeSql(
-          'INSERT INTO favorite_words (user_id, word, phonetic) VALUES (?, ?, ?)',
-          [userId, word, phonetic],
-          (_, result) => {
-            resolve(result.insertId);
+          'SELECT id FROM words WHERE user_id = ? AND word = ?',
+          [userId, word],
+          (_, existResult) => {
+            if (existResult.rows.length > 0) {
+              // 单词已存在，更新为收藏状态
+              const wordId = existResult.rows.item(0).id;
+              tx.executeSql(
+                'UPDATE words SET is_favorite = 1 WHERE id = ?',
+                [wordId],
+                (_, updateResult) => {
+                  resolve(wordId);
+                },
+                (_, error) => reject(error)
+              );
+            } else {
+              // 单词不存在，插入新记录
+              tx.executeSql(
+                'INSERT INTO words (user_id, word, phonetic, is_favorite) VALUES (?, ?, ?, 1)',
+                [userId, word, phonetic],
+                (_, insertResult) => {
+                  resolve(insertResult.insertId);
+                },
+                (_, error) => reject(error)
+              );
+            }
           },
           (_, error) => {
             reject(error);
@@ -24,49 +49,76 @@ export const favoriteWordOperations = {
   addFavoriteWordWithDefinitions: (userId, word, phonetic, definitions) => {
     return new Promise((resolve, reject) => {
       db.transaction(tx => {
-        // 先添加单词
+        // 先检查单词是否已存在
         tx.executeSql(
-          'INSERT INTO favorite_words (user_id, word, phonetic) VALUES (?, ?, ?)',
-          [userId, word, phonetic],
-          (_, wordResult) => {
-            const wordId = wordResult.insertId;
-            
-            // 如果有定义数组，添加所有定义
-            if (definitions && definitions.length > 0) {
-              let completed = 0;
-              
-              definitions.forEach(def => {
-                tx.executeSql(
-                  'INSERT INTO word_definitions (word_id, part_of_speech, definition, example, translation) VALUES (?, ?, ?, ?, ?)',
-                  [
-                    wordId, 
-                    def.partOfSpeech || null, 
-                    def.definition || def.original, 
-                    def.example || null,
-                    def.translated || null
-                  ],
-                  () => {
-                    completed++;
-                    if (completed === definitions.length) {
-                      resolve(wordId);
-                    }
-                  },
-                  (_, error) => {
-                    console.error('Error adding definition:', error);
-                    // 继续添加其他定义，不中断流程
+          'SELECT id FROM words WHERE user_id = ? AND word = ?',
+          [userId, word],
+          (_, existResult) => {
+            if (existResult.rows.length > 0) {
+              // 单词已存在，更新为收藏状态
+              const wordId = existResult.rows.item(0).id;
+              tx.executeSql(
+                'UPDATE words SET is_favorite = 1, phonetic = ? WHERE id = ?',
+                [phonetic, wordId],
+                (_, updateResult) => {
+                  // 处理定义...
+                  if (definitions && definitions.length > 0) {
+                    // 可以考虑先删除旧定义
+                    processDefs(tx, wordId, definitions, resolve);
+                  } else {
+                    resolve(wordId);
                   }
-                );
-              });
+                },
+                (_, error) => reject(error)
+              );
             } else {
+              // 单词不存在，插入新记录
+              tx.executeSql(
+                'INSERT INTO words (user_id, word, phonetic, is_favorite) VALUES (?, ?, ?, 1)',
+                [userId, word, phonetic],
+                (_, insertResult) => {
+                  const wordId = insertResult.insertId;
+                  if (definitions && definitions.length > 0) {
+                    processDefs(tx, wordId, definitions, resolve);
+                  } else {
+                    resolve(wordId);
+                  }
+                },
+                (_, error) => reject(error)
+              );
+            }
+          },
+          (_, error) => reject(error)
+        );
+      });
+    });
+
+    // 辅助函数处理定义添加
+    function processDefs(tx, wordId, definitions, resolve) {
+      let completed = 0;
+      definitions.forEach(def => {
+        tx.executeSql(
+          'INSERT INTO word_definitions (word_id, part_of_speech, definition, example, translation) VALUES (?, ?, ?, ?, ?)',
+          [
+            wordId, 
+            def.partOfSpeech || null, 
+            def.definition || def.original, 
+            def.example || null,
+            def.translated || null
+          ],
+          () => {
+            completed++;
+            if (completed === definitions.length) {
               resolve(wordId);
             }
           },
           (_, error) => {
-            reject(error);
+            console.error('Error adding definition:', error);
+            // 继续添加其他定义，不中断流程
           }
         );
       });
-    });
+    }
   },
 
   // 获取所有收藏单词
@@ -74,7 +126,7 @@ export const favoriteWordOperations = {
     return new Promise((resolve, reject) => {
       db.transaction(tx => {
         tx.executeSql(
-          'SELECT * FROM favorite_words WHERE user_id = ? ORDER BY created_at DESC',
+          'SELECT * FROM words WHERE user_id = ? AND is_favorite = 1 ORDER BY created_at DESC',
           [userId],
           (_, result) => {
             const words = [];
@@ -119,7 +171,7 @@ export const favoriteWordOperations = {
       db.transaction(tx => {
         // 先获取单词基本信息
         tx.executeSql(
-          'SELECT * FROM favorite_words WHERE id = ?',
+          'SELECT * FROM words WHERE id = ?',
           [wordId],
           (_, wordResult) => {
             if (wordResult.rows.length === 0) {
@@ -162,9 +214,9 @@ export const favoriteWordOperations = {
   removeFavoriteWord: (wordId) => {
     return new Promise((resolve, reject) => {
       db.transaction(tx => {
-        // 删除单词时，关联的定义会因为外键级联删除而自动删除
+        // 取消收藏状态，而不是删除记录
         tx.executeSql(
-          'DELETE FROM favorite_words WHERE id = ?',
+          'UPDATE words SET is_favorite = 0 WHERE id = ?',
           [wordId],
           (_, result) => {
             resolve(result.rowsAffected);
@@ -182,13 +234,14 @@ export const favoriteWordOperations = {
     return new Promise((resolve, reject) => {
       db.transaction(tx => {
         tx.executeSql(
-          'SELECT * FROM favorite_words WHERE user_id = ? AND word = ?',
+          'SELECT id, is_favorite FROM words WHERE user_id = ? AND word = ?',
           [userId, word],
           (_, result) => {
             if (result.rows.length > 0) {
+              const item = result.rows.item(0);
               resolve({
-                isFavorite: true,
-                wordId: result.rows.item(0).id
+                isFavorite: item.is_favorite === 1,
+                wordId: item.id
               });
             } else {
               resolve({
@@ -210,7 +263,7 @@ export const favoriteWordOperations = {
     return new Promise((resolve, reject) => {
       db.transaction(tx => {
         tx.executeSql(
-          'SELECT * FROM favorite_words WHERE user_id = ? AND word LIKE ? ORDER BY created_at DESC',
+          'SELECT * FROM words WHERE user_id = ? AND word LIKE ? ORDER BY created_at DESC',
           [userId, `%${searchTerm}%`],
           (_, result) => {
             const words = [];
@@ -228,485 +281,48 @@ export const favoriteWordOperations = {
   }
 };
 
-// 搜索历史相关操作
-export const searchHistoryOperations = {
-  // 添加搜索历史
-  addSearchHistory: (userId, word, definitions = null, phonetic = null) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'INSERT INTO search_history (user_id, word) VALUES (?, ?)',
-          [userId, word],
-          (_, result) => {
-            // 如果有定义和音标信息，可能需要考虑保存到单词表
-            if (definitions && definitions.length > 0) {
-              // 可以选择将单词添加到收藏单词表，但这里只是提供搜索记录
-              resolve(result.insertId);
-            } else {
-              resolve(result.insertId);
-            }
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
-  },
-
-  // 检查搜索历史是否存在
-  checkSearchHistory: (userId, word) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'SELECT * FROM search_history WHERE user_id = ? AND word = ?',
-          [userId, word],
-          (_, result) => {
-            resolve(result.rows.length > 0);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
-  },
-
-  // 获取搜索历史
-  getSearchHistory: (userId, limit = 20) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'SELECT * FROM search_history WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
-          [userId, limit],
-          (_, result) => {
-            const history = [];
-            for (let i = 0; i < result.rows.length; i++) {
-              history.push(result.rows.item(i));
-            }
-            resolve(history);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
-  },
-
-  // 获取最近搜索的单词（不重复）
-  getRecentUniqueSearches: (userId, limit = 10) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'SELECT word, MAX(created_at) as latest_search FROM search_history WHERE user_id = ? GROUP BY word ORDER BY latest_search DESC LIMIT ?',
-          [userId, limit],
-          (_, result) => {
-            const history = [];
-            for (let i = 0; i < result.rows.length; i++) {
-              history.push(result.rows.item(i));
-            }
-            resolve(history);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
-  },
-
-  // 清除所有搜索历史
-  clearSearchHistory: (userId) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'DELETE FROM search_history WHERE user_id = ?',
-          [userId],
-          (_, result) => {
-            resolve(result.rowsAffected);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
-  },
-  
-  // 删除特定的搜索记录
-  removeSearchItem: (searchId) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'DELETE FROM search_history WHERE id = ?',
-          [searchId],
-          (_, result) => {
-            resolve(result.rowsAffected);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
-  },
-  
-  // 将搜索单词添加到收藏
-  addSearchToFavorites: (userId, word, phonetic, definitions) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        // 首先插入单词到收藏表
-        tx.executeSql(
-          'INSERT INTO favorite_words (user_id, word, phonetic) VALUES (?, ?, ?)',
-          [userId, word, phonetic],
-          (_, wordResult) => {
-            const wordId = wordResult.insertId;
-            
-            // 如果有定义，则添加定义
-            if (definitions && definitions.length > 0) {
-              let completed = 0;
-              
-              definitions.forEach(def => {
-                tx.executeSql(
-                  'INSERT INTO word_definitions (word_id, part_of_speech, definition, example) VALUES (?, ?, ?, ?)',
-                  [wordId, def.partOfSpeech, def.definition, def.example || null],
-                  () => {
-                    completed++;
-                    if (completed === definitions.length) {
-                      resolve(wordId);
-                    }
-                  },
-                  (_, definitionError) => {
-                    reject(definitionError);
-                  }
-                );
-              });
-            } else {
-              resolve(wordId);
-            }
-          },
-          (_, wordError) => {
-            reject(wordError);
-          }
-        );
-      });
-    });
-  },
-  
-  // 搜索单词
-  searchWords: (term) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          `SELECT DISTINCT word FROM 
-           (SELECT word FROM favorite_words WHERE word LIKE ? 
-            UNION 
-            SELECT word FROM search_history WHERE word LIKE ?) 
-           AS combined_search ORDER BY word`,
-          [`%${term}%`, `%${term}%`],
-          (_, result) => {
-            const words = [];
-            for (let i = 0; i < result.rows.length; i++) {
-              words.push(result.rows.item(i).word);
-            }
-            resolve(words);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
-  }
-};
-
-// 对象识别历史相关操作
-export const objectDetectionHistoryOperations = {
-  // 添加对象识别历史
-  addObjectDetectionHistory: (userId, objectName, imageUri, confidence, boundingBox = null) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'INSERT INTO detected_objects (user_id, object_name, image_uri, confidence, bounding_box) VALUES (?, ?, ?, ?, ?)',
-          [userId, objectName, imageUri, confidence, boundingBox ? JSON.stringify(boundingBox) : null],
-          (_, result) => {
-            resolve(result.insertId);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
-  },
-
-  // 批量添加对象识别记录（用于处理一张图片中的多个对象）
-  addMultipleObjects: (userId, objects, imageUri) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        const results = [];
-        let completed = 0;
-        
-        objects.forEach(obj => {
-          tx.executeSql(
-            'INSERT INTO detected_objects (user_id, object_name, image_uri, confidence, bounding_box) VALUES (?, ?, ?, ?, ?)',
-            [userId, obj.name, imageUri, obj.value, JSON.stringify(obj.boundingBox)],
-            (_, result) => {
-              results.push(result.insertId);
-              completed++;
-              if (completed === objects.length) {
-                resolve(results);
-              }
-            },
-            (_, error) => {
-              reject(error);
-            }
-          );
-        });
-      });
-    });
-  },
-
-  // 获取对象识别历史
-  getObjectDetectionHistory: (userId, limit = 50) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'SELECT * FROM detected_objects WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
-          [userId, limit],
-          (_, result) => {
-            const history = [];
-            for (let i = 0; i < result.rows.length; i++) {
-              const item = result.rows.item(i);
-              // 解析边界框JSON
-              if (item.bounding_box) {
-                try {
-                  item.bounding_box = JSON.parse(item.bounding_box);
-                } catch (e) {
-                  console.error('Error parsing bounding box', e);
-                }
-              }
-              history.push(item);
-            }
-            resolve(history);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
-  },
-
-  // 根据对象名称搜索检测历史
-  searchObjectsByName: (userId, searchTerm) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'SELECT * FROM detected_objects WHERE user_id = ? AND object_name LIKE ? ORDER BY created_at DESC',
-          [userId, `%${searchTerm}%`],
-          (_, result) => {
-            const objects = [];
-            for (let i = 0; i < result.rows.length; i++) {
-              const item = result.rows.item(i);
-              if (item.bounding_box) {
-                try {
-                  item.bounding_box = JSON.parse(item.bounding_box);
-                } catch (e) {
-                  console.error('Error parsing bounding box', e);
-                }
-              }
-              objects.push(item);
-            }
-            resolve(objects);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
-  },
-
-  // 清除对象识别历史
-  clearObjectDetectionHistory: (userId) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'DELETE FROM detected_objects WHERE user_id = ?',
-          [userId],
-          (_, result) => {
-            resolve(result.rowsAffected);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
-  },
-  
-  // 替换收藏对象方法，转为收藏单词
-  saveObjectAsWord: (userId, objectId) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        // 先获取对象信息
-        tx.executeSql(
-          'SELECT object_name, translation FROM detected_objects WHERE id = ?',
-          [objectId],
-          (_, objResult) => {
-            if (objResult.rows.length === 0) {
-              reject(new Error('Object not found'));
-              return;
-            }
-            
-            const obj = objResult.rows.item(0);
-            const word = obj.object_name;
-            const translation = obj.translation;
-            
-            // 检查单词是否已存在
-            tx.executeSql(
-              'SELECT id FROM favorite_words WHERE user_id = ? AND word = ?',
-              [userId, word],
-              (_, wordResult) => {
-                if (wordResult.rows.length > 0) {
-                  // 单词已存在，返回ID
-                  resolve(wordResult.rows.item(0).id);
-                } else {
-                  // 单词不存在，添加到收藏单词表
-                  tx.executeSql(
-                    'INSERT INTO favorite_words (user_id, word, phonetic) VALUES (?, ?, ?)',
-                    [userId, word, ""],
-                    (_, insertResult) => {
-                      const wordId = insertResult.insertId;
-                      
-                      // 如果有翻译，添加为定义
-                      if (translation) {
-                        tx.executeSql(
-                          'INSERT INTO word_definitions (word_id, definition) VALUES (?, ?)',
-                          [wordId, translation],
-                          () => {
-                            resolve(wordId);
-                          },
-                          (_, defError) => {
-                            // 即使定义添加失败，也返回单词ID
-                            console.error('Error adding definition:', defError);
-                            resolve(wordId);
-                          }
-                        );
-                      } else {
-                        resolve(wordId);
-                      }
-                    },
-                    (_, insertError) => {
-                      reject(insertError);
-                    }
-                  );
-                }
-              },
-              (_, checkError) => {
-                reject(checkError);
-              }
-            );
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
-  },
-  
-  // 获取检测到的物体中可能适合收藏为单词的项目
-  getObjectsForWordCollection: (userId, limit = 20) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          `SELECT do.*, 
-           CASE WHEN fw.id IS NOT NULL THEN 1 ELSE 0 END as is_word_favorite
-           FROM detected_objects do
-           LEFT JOIN favorite_words fw ON fw.word = do.object_name AND fw.user_id = ?
-           WHERE do.user_id = ?
-           ORDER BY do.created_at DESC LIMIT ?`,
-          [userId, userId, limit],
-          (_, result) => {
-            const objects = [];
-            for (let i = 0; i < result.rows.length; i++) {
-              const item = result.rows.item(i);
-              if (item.bounding_box) {
-                try {
-                  item.bounding_box = JSON.parse(item.bounding_box);
-                } catch (e) {
-                  console.error('Error parsing bounding box', e);
-                }
-              }
-              objects.push(item);
-            }
-            resolve(objects);
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
-  },
-
-  // 从对象检测历史中获取单词信息
-  getWordInfoFromDetection: (objectName) => {
-    return new Promise((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'SELECT object_name, translation FROM detected_objects WHERE object_name = ? ORDER BY created_at DESC LIMIT 1',
-          [objectName],
-          (_, result) => {
-            if (result.rows.length > 0) {
-              resolve(result.rows.item(0));
-            } else {
-              resolve(null);
-            }
-          },
-          (_, error) => {
-            reject(error);
-          }
-        );
-      });
-    });
-  }
-};
-
 // 为 WordCard 组件添加获取单词详情的方法
-export const getWordDetailForCard = (word) => {
+export const getWordDetailForCard = (word, userId = DEFAULT_USER_ID) => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       // 先检查单词是否在收藏表中存在
       tx.executeSql(
-        'SELECT id, phonetic FROM favorite_words WHERE word = ?',
-        [word],
+        'SELECT id, phonetic, is_favorite FROM words WHERE word = ? AND user_id = ?',
+        [word, userId],
         (_, wordResult) => {
           if (wordResult.rows.length > 0) {
             // 单词存在于收藏表中，获取其所有定义
             const wordId = wordResult.rows.item(0).id;
             const phonetic = wordResult.rows.item(0).phonetic || "";
+            const isFavorite = wordResult.rows.item(0).is_favorite === 1;
             
             tx.executeSql(
-              'SELECT definition, example FROM word_definitions WHERE word_id = ?',
+              'SELECT definition, example, translation, example_translation FROM word_definitions WHERE word_id = ?',
               [wordId],
               (_, defResult) => {
                 const definitions = [];
                 for (let i = 0; i < defResult.rows.length; i++) {
                   const item = defResult.rows.item(i);
                   definitions.push({
-                    definition: item.definition,
-                    example: item.example || ""
+                    definition: item.definition || item.translation || "",
+                    example: item.example || "",
+                    example_translation: item.example_translation || ""
+                  });
+                }
+                
+                // 如果没有定义，添加一个空定义
+                if (definitions.length === 0) {
+                  definitions.push({
+                    definition: "",
+                    example: ""
                   });
                 }
                 
                 resolve({
+                  word: word,
                   phonetic,
                   definitions,
-                  isFavorite: true, // 已在收藏表中
+                  isFavorite: isFavorite,
                   wordId: wordId
                 });
               },
@@ -723,6 +339,7 @@ export const getWordDetailForCard = (word) => {
                 if (objResult.rows.length > 0 && objResult.rows.item(0).translation) {
                   // 如果在检测对象表中找到单词的翻译
                   resolve({
+                    word: word,
                     phonetic: "",
                     definitions: [
                       {
@@ -736,8 +353,12 @@ export const getWordDetailForCard = (word) => {
                 } else {
                   // 返回空详情对象
                   resolve({
+                    word: word,
                     phonetic: "",
-                    definitions: [],
+                    definitions: [{
+                      definition: "",
+                      example: ""
+                    }],
                     isFavorite: false,
                     wordId: null
                   });
@@ -794,24 +415,16 @@ export const checkWordFavoriteStatus = (userId, word) => {
 };
 
 // 保存 MainScreen 检测到的对象作为单词（可用于添加词汇）
-export const saveDetectedWordWithDefinition = (userId, word, definition = "", phonetic = "") => {
-  return new Promise((resolve, reject) => {
-    // 先检查单词是否已存在
-    favoriteWordOperations.isFavoriteWord(userId, word)
-      .then(({ isFavorite, wordId }) => {
-        if (isFavorite) {
-          // 单词已存在，返回ID
-          resolve(wordId);
-        } else {
-          // 单词不存在，添加它
-          const definitions = definition ? [{ definition, example: "" }] : [];
-          favoriteWordOperations.addFavoriteWordWithDefinitions(userId, word, phonetic, definitions)
-            .then(newWordId => resolve(newWordId))
-            .catch(error => reject(error));
-        }
-      })
-      .catch(error => reject(error));
-  });
+export const saveDetectedWordWithDefinition = (userId = DEFAULT_USER_ID, word, definition = "", phonetic = "", exampleTranslation = "") => {
+  const favorite = {
+    word,
+    phonetic,
+    translation: definition,
+    example: "",
+    exampleTranslation
+  };
+  
+  return favoritesOperations.addFavorite(userId, favorite);
 };
 
 // 从检测对象表中获取单词详情
@@ -943,7 +556,7 @@ export const imageOperations = {
 // 简化的单词操作
 export const wordOperations = {
   // 添加单词
-  addWord: (userId, word) => {
+  addWord: (userId = DEFAULT_USER_ID, word) => {
     return new Promise((resolve, reject) => {
       db.transaction(tx => {
         // 检查单词是否已存在
@@ -1143,7 +756,7 @@ export const detectionOperations = {
 // WordCard 相关便捷方法
 export const wordCardOperations = {
   // 获取用于 WordCard 显示的单词详情
-  getWordDetailsForCard: (wordOrId, userId = null) => {
+  getWordDetails: (wordOrId, userId = DEFAULT_USER_ID) => {
     return new Promise((resolve, reject) => {
       db.transaction(tx => {
         let query;
@@ -1157,11 +770,6 @@ export const wordCardOperations = {
                    WHERE w.id = ?`;
           params = [wordOrId];
         } else {
-          // 必须提供userId来区分是哪个用户的单词
-          if (!userId) {
-            reject(new Error('userId is required when searching by word text'));
-            return;
-          }
           query = `SELECT w.*, i.image_uri 
                    FROM words w
                    LEFT JOIN images i ON w.image_id = i.id
@@ -1173,43 +781,327 @@ export const wordCardOperations = {
           query,
           params,
           (_, wordResult) => {
-            if (wordResult.rows.length === 0) {
-              // 单词不存在，返回空信息
+            if (wordResult.rows.length > 0) {
+              // 单词存在于收藏表中
+              const wordInfo = wordResult.rows.item(0);
+              
+              // 获取单词的定义
+              tx.executeSql(
+                'SELECT * FROM word_definitions WHERE word_id = ?',
+                [wordInfo.id],
+                (_, defResult) => {
+                  const definitions = [];
+                  for (let i = 0; i < defResult.rows.length; i++) {
+                    definitions.push(defResult.rows.item(i));
+                  }
+                  
+                  resolve({
+                    id: wordInfo.id,
+                    word: wordInfo.word,
+                    phonetic: wordInfo.phonetic || "",
+                    definitions: definitions,
+                    isFavorite: wordInfo.is_favorite === 1,
+                    imageUri: wordInfo.image_uri
+                  });
+                },
+                (_, error) => reject(error)
+              );
+            } else if (typeof wordOrId === 'string') {
+              // 检查是否在 detected_objects 表中存在
+              tx.executeSql(
+                'SELECT translation FROM detected_objects WHERE object_name = ? LIMIT 1',
+                [wordOrId],
+                (_, objResult) => {
+                  if (objResult.rows.length > 0 && objResult.rows.item(0).translation) {
+                    // 如果在检测对象表中找到单词的翻译
+                    resolve({
+                      word: wordOrId,
+                      phonetic: "",
+                      definitions: [
+                        {
+                          definition: objResult.rows.item(0).translation,
+                          example: ""
+                        }
+                      ],
+                      isFavorite: false,
+                      wordId: null
+                    });
+                  } else {
+                    // 返回空详情对象
+                    resolve({
+                      word: wordOrId,
+                      phonetic: "",
+                      definitions: [],
+                      isFavorite: false,
+                      wordId: null
+                    });
+                  }
+                },
+                (_, error) => reject(error)
+              );
+            } else {
+              // ID不存在的情况
               resolve({
-                word: typeof wordOrId === 'string' ? wordOrId : null,
+                word: null,
                 phonetic: "",
                 definitions: [],
                 isFavorite: false,
-                imageUri: null
+                wordId: null
               });
-              return;
             }
-            
-            const wordInfo = wordResult.rows.item(0);
-            
-            // 获取单词的定义
-            tx.executeSql(
-              'SELECT * FROM word_definitions WHERE word_id = ?',
-              [wordInfo.id],
-              (_, defResult) => {
-                const definitions = [];
-                for (let i = 0; i < defResult.rows.length; i++) {
-                  definitions.push(defResult.rows.item(i));
-                }
+          },
+          (_, error) => reject(error)
+        );
+      });
+    });
+  },
+  
+  // 从WordCard收藏单词
+  addWordToFavorite: (userId = DEFAULT_USER_ID, word, wordDetail, translatedExample = "") => {
+    return new Promise((resolve, reject) => {
+      // 如果已经收藏过，直接返回
+      if (wordDetail.isFavorite && wordDetail.id) {
+        resolve({ wordId: wordDetail.id, isNew: false });
+        return;
+      }
+      
+      // 准备添加到收藏的参数
+      const favorite = {
+        word,
+        phonetic: wordDetail.phonetic || "",
+        translation: wordDetail.definitions.length > 0 ? wordDetail.definitions[0].definition : null,
+        example: wordDetail.definitions.length > 0 ? wordDetail.definitions[0].example : null,
+        exampleTranslation: translatedExample // 添加翻译后的例句
+      };
+      
+      // 使用 favoritesOperations 添加收藏
+      favoritesOperations.addFavorite(userId, favorite)
+        .then(result => resolve(result))
+        .catch(error => reject(error));
+    });
+  }
+};
+
+// 简化的收藏单词操作，作为唯一的收藏操作接口
+export const favoritesOperations = {
+  // 获取用户的所有收藏单词
+  getFavorites: (userId = DEFAULT_USER_ID) => {
+    return new Promise((resolve, reject) => {
+      db.transaction(tx => {
+        tx.executeSql(
+          `SELECT w.id, w.word, w.phonetic, w.created_at FROM words 
+           WHERE w.user_id = ? AND w.is_favorite = 1 
+           ORDER BY w.created_at DESC`,
+          [userId],
+          async (_, result) => {
+            try {
+              const favorites = [];
+              
+              // 获取每个单词的定义
+              for (let i = 0; i < result.rows.length; i++) {
+                const word = result.rows.item(i);
                 
-                resolve({
-                  id: wordInfo.id,
-                  word: wordInfo.word,
-                  phonetic: wordInfo.phonetic || "",
-                  definitions: definitions,
-                  isFavorite: wordInfo.is_favorite === 1,
-                  imageUri: wordInfo.image_uri
+                // 获取定义
+                const definitions = await new Promise((resolveDefinitions, rejectDefinitions) => {
+                  tx.executeSql(
+                    'SELECT * FROM word_definitions WHERE word_id = ?',
+                    [word.id],
+                    (_, defResult) => {
+                      const defs = [];
+                      for (let j = 0; j < defResult.rows.length; j++) {
+                        defs.push(defResult.rows.item(j));
+                      }
+                      resolveDefinitions(defs);
+                    },
+                    (_, error) => rejectDefinitions(error)
+                  );
                 });
-              },
-              (_, error) => {
-                reject(error);
+                
+                // 构建完整的收藏对象
+                favorites.push({
+                  id: word.id,
+                  word: word.word,
+                  phonetic: word.phonetic || "",
+                  // 使用第一个定义作为主要定义和示例
+                  translation: definitions.length > 0 ? definitions[0].translation : "",
+                  example: definitions.length > 0 ? definitions[0].example : "",
+                  exampleTranslation: definitions.length > 0 ? definitions[0].example_translation : "",
+                  created_at: word.created_at,
+                  definitions: definitions
+                });
               }
-            );
+              
+              resolve(favorites);
+            } catch (error) {
+              reject(error);
+            }
+          },
+          (_, error) => reject(error)
+        );
+      });
+    });
+  },
+  
+  // 添加收藏（简化版，包含翻译）
+  addFavorite: (userId = DEFAULT_USER_ID, favorite) => {
+    const { word, phonetic = "", translation = null, example = null, exampleTranslation = null } = favorite;
+    
+    return new Promise((resolve, reject) => {
+      db.transaction(tx => {
+        tx.executeSql(
+          'SELECT id, is_favorite FROM words WHERE user_id = ? AND word = ?',
+          [userId, word],
+          (_, existResult) => {
+            if (existResult.rows.length > 0) {
+              // 单词已存在，获取ID并更新收藏状态
+              const wordId = existResult.rows.item(0).id;
+              const isFavorite = existResult.rows.item(0).is_favorite === 1;
+              
+              if (isFavorite) {
+                // 已经是收藏状态
+                resolve({ id: wordId, isNew: false });
+                return;
+              }
+              
+              // 更新为收藏状态
+              tx.executeSql(
+                'UPDATE words SET is_favorite = 1, phonetic = ? WHERE id = ?',
+                [phonetic, wordId],
+                () => {
+                  // 添加定义
+                  if (translation) {
+                    tx.executeSql(
+                      'INSERT INTO word_definitions (word_id, definition, example, translation, example_translation) VALUES (?, ?, ?, ?, ?)',
+                      [wordId, null, example, translation, exampleTranslation],
+                      () => resolve({ id: wordId, isNew: false }),
+                      (_, defError) => reject(defError)
+                    );
+                  } else {
+                    resolve({ id: wordId, isNew: false });
+                  }
+                },
+                (_, updateError) => reject(updateError)
+              );
+            } else {
+              // 新增单词
+              tx.executeSql(
+                'INSERT INTO words (user_id, word, phonetic, is_favorite) VALUES (?, ?, ?, 1)',
+                [userId, word, phonetic],
+                (_, insertResult) => {
+                  const wordId = insertResult.insertId;
+                  
+                  // 添加定义
+                  if (translation) {
+                    tx.executeSql(
+                      'INSERT INTO word_definitions (word_id, definition, example, translation, example_translation) VALUES (?, ?, ?, ?, ?)',
+                      [wordId, null, example, translation, exampleTranslation],
+                      () => resolve({ id: wordId, isNew: true }),
+                      (_, defError) => reject(defError)
+                    );
+                  } else {
+                    resolve({ id: wordId, isNew: true });
+                  }
+                },
+                (_, insertError) => reject(insertError)
+              );
+            }
+          },
+          (_, checkError) => reject(checkError)
+        );
+      });
+    });
+  },
+  
+  // 删除收藏
+  deleteFavorite: (wordId) => {
+    return new Promise((resolve, reject) => {
+      db.transaction(tx => {
+        tx.executeSql(
+          'UPDATE words SET is_favorite = 0 WHERE id = ?',
+          [wordId],
+          (_, result) => resolve(result.rowsAffected > 0),
+          (_, error) => reject(error)
+        );
+      });
+    });
+  },
+  
+  // 检查是否收藏
+  isFavoriteExist: (userId = DEFAULT_USER_ID, word) => {
+    return new Promise((resolve, reject) => {
+      db.transaction(tx => {
+        tx.executeSql(
+          'SELECT id, is_favorite FROM words WHERE user_id = ? AND word = ?',
+          [userId, word],
+          (_, result) => {
+            if (result.rows.length > 0) {
+              const item = result.rows.item(0);
+              resolve({
+                exists: true,
+                isFavorite: item.is_favorite === 1,
+                id: item.id
+              });
+            } else {
+              resolve({
+                exists: false,
+                isFavorite: false,
+                id: null
+              });
+            }
+          },
+          (_, error) => reject(error)
+        );
+      });
+    });
+  },
+  
+  // 切换收藏状态
+  toggleFavorite: (userId = DEFAULT_USER_ID, favorite) => {
+    const { word, phonetic = "", translation = null, example = null, exampleTranslation = null } = favorite;
+    
+    return new Promise((resolve, reject) => {
+      // 先检查词是否存在且是否收藏
+      favoritesOperations.isFavoriteExist(userId, word)
+        .then(({ exists, isFavorite, id }) => {
+          if (exists && isFavorite) {
+            // 取消收藏
+            favoritesOperations.deleteFavorite(id)
+              .then(() => resolve({ id, isFavorite: false }))
+              .catch(error => reject(error));
+          } else if (exists && !isFavorite) {
+            // 已存在但未收藏，将其收藏
+            db.transaction(tx => {
+              tx.executeSql(
+                'UPDATE words SET is_favorite = 1 WHERE id = ?',
+                [id],
+                () => resolve({ id, isFavorite: true }),
+                (_, error) => reject(error)
+              );
+            });
+          } else {
+            // 不存在，添加新收藏
+            favoritesOperations.addFavorite(userId, favorite)
+              .then(result => resolve({ id: result.id, isFavorite: true }))
+              .catch(error => reject(error));
+          }
+        })
+        .catch(error => reject(error));
+    });
+  },
+
+  // 搜索收藏单词 
+  searchFavoriteWords: (userId = DEFAULT_USER_ID, searchTerm) => {
+    return new Promise((resolve, reject) => {
+      db.transaction(tx => {
+        tx.executeSql(
+          'SELECT * FROM words WHERE user_id = ? AND is_favorite = 1 AND word LIKE ? ORDER BY created_at DESC',
+          [userId, `%${searchTerm}%`],
+          (_, result) => {
+            const words = [];
+            for (let i = 0; i < result.rows.length; i++) {
+              words.push(result.rows.item(i));
+            }
+            resolve(words);
           },
           (_, error) => {
             reject(error);
@@ -1217,15 +1109,12 @@ export const wordCardOperations = {
         );
       });
     });
-  },
-  
-  // 从WordCard收藏单词
-  toggleWordFavorite: (wordId, setFavorite) => {
-    return wordOperations.toggleFavorite(wordId, setFavorite);
   }
 };
 
-// 导出简化后的操作
+// 导出默认对象
 export default {
-  wordOperations
+  wordOperations,
+  wordCardOperations,
+  favoritesOperations
 }; 
