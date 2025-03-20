@@ -204,13 +204,13 @@ const MainScreen = () => {
       <View className="flex-row justify-around pb-5">
         <TouchableOpacity
           onPress={handleUpload}
-          className="p-2.5 bg-[#FF914D] rounded"
+          className="p-2.5 bg-[#FF914D] rounded-full px-5"
         >
           <Text className="text-white">Upload</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={handleTakePhoto}
-          className="p-2.5 bg-[#FF914D] rounded"
+          className="p-2.5 bg-[#FF914D] rounded-full px-5"
         >
           <Text className="text-white">Take Photo</Text>
         </TouchableOpacity>
