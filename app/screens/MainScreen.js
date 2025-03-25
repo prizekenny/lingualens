@@ -6,6 +6,7 @@ import * as FileSystem from "expo-file-system";
 import { detectObjects } from "../api/detection";
 import WordCard from "../../components/WordCard";
 import { useRouter } from "expo-router";
+import { StyleSheet, ActivityIndicator } from "react-native";
 
 const MainScreen = () => {
   const router = useRouter();
@@ -22,19 +23,23 @@ const MainScreen = () => {
     height: 0,
   });
   const [selectedWord, setSelectedWord] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const handleUpload = async () => {
     const permissionResult =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
       alert("Permission to access camera roll is required!");
+      setLoading(false);
       return;
     }
+
     const result = await ImagePicker.launchImageLibraryAsync();
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const selectedAsset = result.assets[0];
       setImageUri(selectedAsset.uri);
 
+      // 计算图片尺寸与位置
       const { width, height } = await new Promise((resolve) => {
         Image.getSize(selectedAsset.uri, (width, height) =>
           resolve({ width, height })
@@ -56,7 +61,9 @@ const MainScreen = () => {
       const left = (containerWidth - newWidth) / 2;
       setImagePosition({ top, left, width: newWidth, height: newHeight });
 
-      // 下面的代码替换了！
+      setLoading(true); // 开始加载
+      setDetectedObjects([]); // 清除已识别单词
+
       let objects;
       if (selectedAsset.uri.startsWith("file://")) {
         const base64 = await FileSystem.readAsStringAsync(selectedAsset.uri, {
@@ -67,6 +74,7 @@ const MainScreen = () => {
         objects = await detectObjects(selectedAsset.uri);
       }
 
+      setLoading(false); // 加载完成
       setDetectedObjects(objects);
     }
   };
@@ -106,6 +114,9 @@ const MainScreen = () => {
       const left = (containerWidth - newWidth) / 2;
       setImagePosition({ top, left, width: newWidth, height: newHeight });
 
+      setLoading(true);
+      setDetectedObjects([]);
+
       // 下面的代码替换了！
       let objects;
       if (capturedAsset.uri.startsWith("file://")) {
@@ -117,6 +128,7 @@ const MainScreen = () => {
         objects = await detectObjects(capturedAsset.uri);
       }
 
+      setLoading(false);
       setDetectedObjects(objects);
     }
   };
@@ -144,6 +156,21 @@ const MainScreen = () => {
       <View className="items-center">
         <Logo imageSize={80} fontSize={30} />
       </View>
+
+      {loading && (
+        <View
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+          }}
+        >
+          <ActivityIndicator size="large" color="#FF914D" />
+          <Text style={{ color: "white", marginTop: 10 }}>Processing...</Text>
+        </View>
+      )}
 
       <View
         className="flex-1 bg-gray-500 justify-center items-center overflow-hidden relative mb-5"
