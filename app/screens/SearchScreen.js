@@ -5,10 +5,10 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { getWordData } from "../services/WordService"; // ✅ 使用wordService获取数据
+import { getWordData } from "../services/WordService";
+import WordCard from "../../components/WordCard";
 
 const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -20,7 +20,6 @@ const SearchScreen = () => {
   const handleSearch = async () => {
     if (searchQuery.trim() === "") return;
 
-    setIsLoading(true);
     setErrorMessage("");
     setWordData(null);
 
@@ -35,8 +34,6 @@ const SearchScreen = () => {
     } catch (error) {
       console.error("❌ 查询失败:", error);
       setErrorMessage("Failed to fetch word data.");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -59,21 +56,18 @@ const SearchScreen = () => {
             placeholderTextColor="#aaa"
             value={searchQuery}
             onChangeText={setSearchQuery}
+            onSubmitEditing={handleSearch} // ⌨️ 回车等于点按钮
+            returnKeyType="search"
           />
-          <TouchableOpacity onPress={handleCancel}>
-            <Text className="text-orange-500 text-base font-bold ml-2">
-              Cancel
-            </Text>
+          {searchQuery !== "" && (
+            <TouchableOpacity onPress={handleCancel} className="mr-2">
+              <Ionicons name="close-circle" size={22} color="#DC2626" />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={handleSearch}>
+            <Text className="text-orange-500 font-bold">Translate</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          onPress={handleSearch}
-          className="mt-2 bg-orange-500 rounded-full py-2 px-4"
-        >
-          <Text className="text-white text-base font-bold text-center">
-            Search
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {/* 🔹 显示查询结果 */}
@@ -82,51 +76,15 @@ const SearchScreen = () => {
         showsVerticalScrollIndicator={true}
         contentContainerStyle={{ flexGrow: 1 }}
       >
-        {isLoading && (
-          <View className="flex-1 justify-center items-center mt-5">
-            <ActivityIndicator size="large" color="#FF914D" />
-            <Text className="text-base text-gray-800 mt-2">Loading...</Text>
-          </View>
-        )}
-
         {errorMessage !== "" && (
           <View className="flex-1 justify-center items-center mt-5">
             <Text className="text-base text-red-500">{errorMessage}</Text>
           </View>
         )}
 
-        {/* 🔹 显示单词详情 */}
-        {wordData && (
-          <View className="mt-5 pb-10">
-            {/* 显示音标 */}
-            {wordData.phonetic && (
-              <Text className="text-sm text-gray-500 mb-3">
-                {wordData.word} {wordData.phonetic}
-              </Text>
-            )}
-
-            {/* 显示定义列表 */}
-            {wordData.definitions.length > 0 ? (
-              wordData.definitions.map((item, index) => (
-                <View key={index} className="mb-6">
-                  <Text className="text-sm text-gray-800">
-                    {index + 1}. {item.original}
-                  </Text>
-                  <Text className="text-sm text-gray-600 mt-1">
-                    {item.translated}
-                  </Text>
-                  {item.example && (
-                    <Text className="text-xs text-gray-500 mt-1">
-                      Example: {item.example}
-                    </Text>
-                  )}
-                </View>
-              ))
-            ) : (
-              <Text className="text-sm text-gray-400">
-                No definitions available.
-              </Text>
-            )}
+        {wordData && wordData.word && (
+          <View className="items-center mt-5 pb-10">
+            <WordCard wordName={wordData.word} />
           </View>
         )}
       </ScrollView>

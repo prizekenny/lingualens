@@ -173,7 +173,7 @@ const MainScreen = () => {
       )}
 
       <View
-        className="flex-1 bg-gray-500 justify-center items-center overflow-hidden relative mb-5"
+        className="flex-1 bg-transparent justify-center items-center overflow-hidden relative mb-5"
         onLayout={(event) => {
           const { width, height } = event.nativeEvent.layout;
           setContainerDimensions({ width, height });
@@ -192,6 +192,13 @@ const MainScreen = () => {
           }}
           resizeMode="contain"
         />
+        {!imageUri && (
+          <View className="absolute items-center justify-center px-10">
+            <Text className="text-[#FF914D] text-lg font-semibold text-center">
+              Tap "Upload" or "Take Photo" to start detecting objects.
+            </Text>
+          </View>
+        )}
 
         {topObjects.map((obj, index) => {
           const posX =

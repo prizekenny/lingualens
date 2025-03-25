@@ -14,6 +14,7 @@ import {
   addFavorite,
 } from "../app/services/DatabaseService";
 import { getWordData } from "../app/services/WordService";
+import { Keyboard } from "react-native";
 
 const WordCard = ({ wordName, onClose }) => {
   const [wordDetails, setWordDetails] = useState(null);
@@ -55,18 +56,36 @@ const WordCard = ({ wordName, onClose }) => {
     }
   };
 
+  const isPopup = !!onClose;
+  const textColorPrimary = isPopup ? "#E5E7EB" : "#1F2937"; // gray-200 vs gray-800
+  const textColorSecondary = isPopup ? "#9CA3AF" : "#4B5563"; // gray-400 vs gray-600
+
   return (
     <View
-      style={{
-        width: "90%",
-        backgroundColor: "#1F2937",
-        borderRadius: 12,
-        padding: 16,
-        maxHeight: "80%",
-      }}
+      style={[
+        !isPopup
+          ? {
+              flex: 1,
+              width: "100%",
+              padding: 2,
+            }
+          : {
+              width: "90%",
+              backgroundColor: "#1F2937",
+              borderRadius: 12,
+              padding: 16,
+              maxHeight: "80%",
+            },
+      ]}
     >
       <View className="flex-row items-center justify-between mb-3">
-        <Text className="text-white text-xl font-bold">{wordName}</Text>
+        <Text
+          className={`text-xl font-bold ${
+            isPopup ? "text-white" : "text-gray-800"
+          }`}
+        >
+          {wordName}
+        </Text>
         <TouchableOpacity onPress={handleToggleFavorite}>
           <Ionicons
             name={isFavorited ? "heart" : "heart-outline"}
@@ -83,16 +102,28 @@ const WordCard = ({ wordName, onClose }) => {
           showsVerticalScrollIndicator={true}
           contentContainerStyle={{ paddingBottom: 20 }}
         >
-          <Text className="text-orange-400 text-sm mb-3">
+          <Text
+            className={`text-sm mb-3 ${
+              isPopup ? "text-orange-400" : "text-orange-600"
+            }`}
+          >
             {wordDetails.translation}
           </Text>
           {wordDetails.definitions.length > 0 ? (
             wordDetails.definitions.map((item, index) => (
               <View key={index} className="mb-5">
-                <Text className="text-sm text-gray-200">
+                <Text
+                  className={`text-sm ${
+                    isPopup ? "text-gray-200" : "text-gray-800"
+                  }`}
+                >
                   {index + 1}. {item.original}
                 </Text>
-                <Text className="text-xs text-gray-400 mt-1">
+                <Text
+                  className={`text-xs mt-1 ${
+                    isPopup ? "text-gray-400" : "text-gray-600"
+                  }`}
+                >
                   {item.translated}
                 </Text>
               </View>
@@ -107,12 +138,14 @@ const WordCard = ({ wordName, onClose }) => {
         <Text className="text-sm text-gray-400">No data found</Text>
       )}
 
-      <TouchableOpacity
-        onPress={onClose}
-        className="mt-3 bg-red-500 rounded-full py-2 px-4 self-center"
-      >
-        <Text className="text-white text-center font-bold">Close</Text>
-      </TouchableOpacity>
+      {isPopup && (
+        <TouchableOpacity
+          onPress={onClose}
+          className="mt-3 bg-red-500 rounded-full py-2 px-4 self-center"
+        >
+          <Text className="text-white text-center font-bold">Close</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
