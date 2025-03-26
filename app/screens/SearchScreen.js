@@ -5,16 +5,20 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { getWordData } from "../services/WordService";
 import WordCard from "../../components/WordCard";
+import { useTranslation } from "../i18n/useTranslation";
 
 const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [wordData, setWordData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [showWordCard, setShowWordCard] = useState(false);
+  const { t } = useTranslation();
 
   // 🔹 处理查询
   const handleSearch = async () => {
@@ -28,6 +32,7 @@ const SearchScreen = () => {
       if (fetchedWordData) {
         console.log("📌 查询到的单词数据:", fetchedWordData);
         setWordData(fetchedWordData);
+        setShowWordCard(true); // 显示单词卡
       } else {
         setErrorMessage("No definition found.");
       }
@@ -42,6 +47,12 @@ const SearchScreen = () => {
     setSearchQuery("");
     setWordData(null);
     setErrorMessage("");
+    setShowWordCard(false);
+  };
+
+  // 关闭词卡
+  const handleCloseWordCard = () => {
+    setShowWordCard(false);
   };
 
   return (
@@ -52,7 +63,7 @@ const SearchScreen = () => {
           <Ionicons name="search" size={20} color="#aaa" className="mr-2" />
           <TextInput
             className="flex-1 pl-2 pb-1 text-base text-gray-800 bg-transparent"
-            placeholder="Enter a word..."
+            placeholder={t('search.placeholder')}
             placeholderTextColor="#aaa"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -65,12 +76,12 @@ const SearchScreen = () => {
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={handleSearch}>
-            <Text className="text-orange-500 font-bold">Translate</Text>
+            <Text className="text-orange-500 font-bold">{t('common.translate')}</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* 🔹 显示查询结果 */}
+      {/* 🔹 显示查询结果摘要 */}
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={true}
@@ -84,10 +95,38 @@ const SearchScreen = () => {
 
         {wordData && wordData.word && (
           <View className="items-center mt-5 pb-10">
-            <WordCard wordName={wordData.word} />
+            <TouchableOpacity 
+              onPress={() => setShowWordCard(true)}
+              className="bg-gray-100 p-4 rounded-lg w-full"
+            >
+              <Text className="text-lg font-bold">{wordData.word}</Text>
+              <Text className="text-sm text-gray-600">{wordData.translation?.substring(0, 100)}...</Text>
+              <Text className="text-orange-500 mt-2">{t('search.viewDetails')}</Text>
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
+
+      {/* 单词卡弹窗 */}
+      <Modal visible={showWordCard} transparent animationType="fade">
+        <TouchableOpacity 
+          activeOpacity={1}
+          style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onPress={handleCloseWordCard}
+        >
+          <View 
+            style={{ 
+              // 确保View没有额外的触摸区域
+              overflow: 'hidden',
+              borderRadius: 12 // 与WordCard一致的圆角
+            }}
+          >
+            {wordData && wordData.word && (
+              <WordCard wordName={wordData.word} onClose={handleCloseWordCard} />
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };

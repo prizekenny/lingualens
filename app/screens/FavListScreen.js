@@ -11,11 +11,13 @@ import {
 import { useFocusEffect } from "@react-navigation/native"; // ✅ 监听屏幕聚焦
 import { getAllFavorites, removeFavorite } from "../services/DatabaseService";
 import WordCard from "../../components/WordCard";
+import { useTranslation } from "../i18n/useTranslation";
 
 const FavListScreen = () => {
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedWord, setSelectedWord] = useState(null);
+  const { t } = useTranslation();
 
   // 加载收藏列表
   const fetchFavorites = useCallback(async () => {
@@ -47,22 +49,22 @@ const FavListScreen = () => {
   // 删除收藏
   const handleDelete = async (word) => {
     Alert.alert(
-      "Delete Favorite",
-      `Are you sure you want to remove "${word}" from favorites?`,
+      t('favorites.deleteTitle'),
+      t('favorites.deleteConfirm', { word: word }),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t('common.cancel'), style: "cancel" },
         {
-          text: "Delete",
+          text: t('common.delete'),
           style: "destructive",
           onPress: async () => {
             try {
               await removeFavorite(word);
-              await fetchFavorites(); // **删除成功后，刷新收藏列表**
+              await fetchFavorites();
             } catch (error) {
               console.error("❌ 删除收藏失败:", error);
               Alert.alert(
-                "Error",
-                "Could not delete favorite. Please try again."
+                t('common.error'),
+                t('favorites.deleteError')
               );
             }
           },
@@ -73,16 +75,16 @@ const FavListScreen = () => {
 
   return (
     <View className="flex-1 px-4 pt-14 bg-white">
-      <Text className="text-2xl font-bold mb-4">Favorites</Text>
+      <Text className="text-2xl font-bold mb-4">{t('favorites.title')}</Text>
 
       {loading ? (
         <View className="flex-1 justify-center items-center mt-5">
           <ActivityIndicator size="large" color="#FF914D" />
-          <Text className="text-gray-500 mt-2">Loading favorites...</Text>
+          <Text className="text-gray-500 mt-2">{t('favorites.loading')}</Text>
         </View>
       ) : favorites.length === 0 ? (
         <Text className="text-gray-500 text-center mt-10">
-          No favorites yet.
+          {t('favorites.empty')}
         </Text>
       ) : (
         <ScrollView>
@@ -95,7 +97,7 @@ const FavListScreen = () => {
                 {/* 点击单词，打开 WordCard */}
                 <TouchableOpacity onPress={() => setSelectedWord(item.word)}>
                   <Text className="text-lg font-semibold text-gray-900">
-                    {index + 1}. {item.word}
+                    {item.word}
                   </Text>
                 </TouchableOpacity>
 
@@ -104,7 +106,7 @@ const FavListScreen = () => {
                   onPress={() => handleDelete(item.word)}
                   className="bg-red-500 px-2 py-1 rounded-lg"
                 >
-                  <Text className="text-white">Delete</Text>
+                  <Text className="text-white">{t('common.delete')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -114,11 +116,22 @@ const FavListScreen = () => {
 
       {/* 弹出 WordCard */}
       <Modal visible={selectedWord !== null} transparent animationType="fade">
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          {selectedWord && (
-            <WordCard wordName={selectedWord} onClose={handleCloseWordCard} />
-          )}
-        </View>
+        <TouchableOpacity 
+          activeOpacity={1}
+          style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onPress={handleCloseWordCard}
+        >
+          <View 
+            style={{ 
+              overflow: 'hidden',
+              borderRadius: 12 // 与WordCard一致的圆角
+            }}
+          >
+            {selectedWord && (
+              <WordCard wordName={selectedWord} onClose={handleCloseWordCard} />
+            )}
+          </View>
+        </TouchableOpacity>
       </Modal>
     </View>
   );

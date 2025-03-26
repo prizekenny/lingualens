@@ -1,4 +1,5 @@
 import { openDatabaseAsync } from "expo-sqlite";
+import * as FileSystem from 'expo-file-system';
 
 let db = null;
 
@@ -19,7 +20,9 @@ const getDatabase = async () => {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         word TEXT NOT NULL UNIQUE,
         phonetic TEXT,
-        timestamp INTEGER
+        translation TEXT,
+        timestamp INTEGER,
+        language TEXT
       );
     `);
 
@@ -60,7 +63,7 @@ export const addFavorite = async (favorite) => {
     return;
   }
 
-  const { word, phonetic = "", definitions = [] } = favorite;
+  const { word, phonetic = "", definitions = [], language } = favorite;
   const timestamp = Date.now();
   const db = await getDatabase();
   if (!db) {
@@ -72,7 +75,7 @@ export const addFavorite = async (favorite) => {
     console.log(`📌 处理收藏: ${JSON.stringify(favorite, null, 2)}`);
 
     const wordName = word.trim();
-    // 1️⃣ **检查是否已存在 `word`**
+    // 1️⃣ 检查是否已存在 word
     const existingEntry = await db.getFirstAsync(
       "SELECT id FROM favorites WHERE word = ?",
       [wordName]
@@ -85,28 +88,24 @@ export const addFavorite = async (favorite) => {
       "长度:",
       wordName.length
     );
-    console.log(
-      "📌 [DEBUG] Unicode:",
-      [...wordName].map((c) => c.charCodeAt(0))
-    );
 
     let favoriteId;
     if (existingEntry) {
-      // 2️⃣ **如果 `word` 存在，执行 `UPDATE`**
+      // 2️⃣ 如果 word 存在，执行 UPDATE
       await db.runAsync(
-        "UPDATE favorites SET phonetic = ?, timestamp = ? WHERE word = ?",
-        [phonetic.trim(), timestamp, wordName]
+        "UPDATE favorites SET phonetic = ?, translation = ?, timestamp = ?, language = ? WHERE word = ?",
+        [phonetic.trim(), favorite.translation || "", timestamp, language, wordName]
       );
       favoriteId = existingEntry.id;
       console.log("✅ 现有单词已更新:", wordName);
     } else {
-      // 3️⃣ **如果 `word` 不存在，执行 `INSERT`**
+      // 3️⃣ 如果 word 不存在，执行 INSERT
       await db.runAsync(
-        "INSERT INTO favorites (word, phonetic, timestamp) VALUES (?, ?, ?)",
-        [wordName, phonetic.trim(), timestamp]
+        "INSERT INTO favorites (word, phonetic, translation, timestamp, language) VALUES (?, ?, ?, ?, ?)",
+        [wordName, phonetic.trim(), favorite.translation || "", timestamp, language]
       );
 
-      // 获取新插入的 `id`
+      // 获取新插入的 id
       const newEntry = await db.getFirstAsync(
         "SELECT last_insert_rowid() AS id"
       );
@@ -118,35 +117,35 @@ export const addFavorite = async (favorite) => {
     }
 
     console.log("📌 [DEBUG] 处理 definitions 数量:", definitions.length);
-    // 4️⃣ **处理 `definitions`**
+    // 4️⃣ 处理 definitions
     for (const def of definitions) {
       console.log("📌 [DEBUG] 处理 definition:", def);
 
-      if (!def.original) continue; // **确保定义不为空**
+      if (!def.definition) continue; // 确保定义不为空
 
-      // 检查 `definition` 是否已存在
+      // 检查 definition 是否已存在
       const existingDef = await db.getFirstAsync(
         "SELECT id FROM definitions WHERE favorite_id = ? AND definition = ?",
-        [favoriteId, def.original.trim()] // **这里用 original 代替 definition**
+        [favoriteId, def.definition.trim()] // 统一使用 definition 字段名
       );
 
       console.log("📌 [DEBUG] 处理 definition exist?:", existingDef);
 
       if (!existingDef) {
-        // 插入 `definition`
+        // 插入 definition
         await db.runAsync(
           "INSERT INTO definitions (favorite_id, definition, translation, example, exampleTranslation) VALUES (?, ?, ?, ?, ?)",
           [
             favoriteId,
-            def.original.trim() || "", // **用 original 代替 definition**
-            def.translated.trim() || "", // **用 translated 代替 translation**
-            def.example.trim() || "",
+            def.definition.trim() || "", // 统一使用 definition
+            def.translation.trim() || "", // 统一使用 translation
+            def.example?.trim() || "",
             def.exampleTranslation?.trim() || "",
           ]
         );
-        console.log(`✅ 新定义插入: ${def.original.substring(0, 30)}...`);
+        console.log(`✅ 新定义插入: ${def.definition.substring(0, 30)}...`);
       } else {
-        console.log(`⚠️ 定义已存在，跳过: ${def.original.substring(0, 30)}...`);
+        console.log(`⚠️ 定义已存在，跳过: ${def.definition.substring(0, 30)}...`);
       }
     }
   } catch (error) {
@@ -204,7 +203,7 @@ export const getAllFavorites = async () => {
 
   try {
     const favorites = await db.getAllAsync(
-      "SELECT id, word, phonetic, timestamp FROM favorites ORDER BY timestamp DESC"
+      "SELECT id, word, phonetic, translation, timestamp FROM favorites ORDER BY timestamp DESC"
     );
 
     for (let i = 0; i < favorites.length; i++) {
@@ -244,6 +243,34 @@ export const getFavoriteByWord = async (word) => {
   }
 };
 
+// 重置数据库
+export const resetDatabase = async () => {
+  try {
+    if (db) {
+      await db.closeAsync();
+      db = null;
+    }
+    
+    // 删除数据库文件
+    const dbDir = `${FileSystem.documentDirectory}SQLite/`;
+    const dbPath = `${dbDir}lingualens.db`;
+    
+    // 检查文件是否存在
+    const fileInfo = await FileSystem.getInfoAsync(dbPath);
+    if (fileInfo.exists) {
+      await FileSystem.deleteAsync(dbPath);
+      console.log("数据库文件已删除");
+    }
+    
+    // 重新初始化数据库
+    db = await getDatabase();
+    return true;
+  } catch (error) {
+    console.error("重置数据库失败:", error);
+    return false;
+  }
+};
+
 // ✅ 默认导出
 export default {
   addFavorite,
@@ -251,4 +278,5 @@ export default {
   isFavorite,
   getAllFavorites,
   getFavoriteByWord,
+  resetDatabase,
 };

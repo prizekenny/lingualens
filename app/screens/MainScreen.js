@@ -7,6 +7,7 @@ import { detectObjects } from "../api/detection";
 import WordCard from "../../components/WordCard";
 import { useRouter } from "expo-router";
 import { StyleSheet, ActivityIndicator } from "react-native";
+import { useTranslation } from "../i18n/useTranslation";
 
 const MainScreen = () => {
   const router = useRouter();
@@ -24,6 +25,7 @@ const MainScreen = () => {
   });
   const [selectedWord, setSelectedWord] = useState(null);
   const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
 
   const handleUpload = async () => {
     const permissionResult =
@@ -168,7 +170,7 @@ const MainScreen = () => {
           }}
         >
           <ActivityIndicator size="large" color="#FF914D" />
-          <Text style={{ color: "white", marginTop: 10 }}>Processing...</Text>
+          <Text style={{ color: "white", marginTop: 10 }}>{t('common.loading')}</Text>
         </View>
       )}
 
@@ -195,7 +197,7 @@ const MainScreen = () => {
         {!imageUri && (
           <View className="absolute items-center justify-center px-10">
             <Text className="text-[#FF914D] text-lg font-semibold text-center">
-              Tap "Upload" or "Take Photo" to start detecting objects.
+              {t('main.cameraPrompt')}
             </Text>
           </View>
         )}
@@ -240,18 +242,19 @@ const MainScreen = () => {
           onPress={handleUpload}
           className="p-2.5 bg-[#FF914D] rounded-full px-5"
         >
-          <Text className="text-white">Upload</Text>
+          <Text className="text-white">{t('main.upload')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={handleTakePhoto}
           className="p-2.5 bg-[#FF914D] rounded-full px-5"
         >
-          <Text className="text-white">Take Photo</Text>
+          <Text className="text-white">{t('main.takePhoto')}</Text>
         </TouchableOpacity>
       </View>
 
       {selectedWord && (
-        <View
+        <TouchableOpacity
+          activeOpacity={1}
           style={{
             position: "absolute",
             top: 0,
@@ -263,12 +266,20 @@ const MainScreen = () => {
             alignItems: "center",
             zIndex: 1000,
           }}
+          onPress={() => setSelectedWord(null)}
         >
-          <WordCard
-            wordName={selectedWord.name}
-            onClose={() => setSelectedWord(null)}
-          />
-        </View>
+          <View 
+            style={{ 
+              overflow: 'hidden',
+              borderRadius: 12
+            }}
+          >
+            <WordCard
+              wordName={selectedWord.name}
+              onClose={() => setSelectedWord(null)}
+            />
+          </View>
+        </TouchableOpacity>
       )}
     </View>
   );

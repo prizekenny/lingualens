@@ -1,7 +1,10 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "../i18n/useTranslation";
 
 export default function Layout() {
+  const { t } = useTranslation();
+  
   return (
     <Tabs
       screenOptions={{
@@ -17,7 +20,7 @@ export default function Layout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: t('navigation.home'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" color={color} size={size} />
           ),
@@ -26,7 +29,7 @@ export default function Layout() {
       <Tabs.Screen
         name="search"
         options={{
-          title: "Search",
+          title: t('navigation.search'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="search-outline" color={color} size={size} />
           ),
@@ -35,43 +38,19 @@ export default function Layout() {
       <Tabs.Screen
         name="fav-list"
         options={{
-          title: "Favorites",
+          title: t('navigation.favorites'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="heart-outline" color={color} size={size} />
           ),
         }}
       />
-      {/* <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" color={color} size={size} />
-          ),
-        }}
-      /> */}
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Settings",
+          title: t('navigation.settings'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings-outline" color={color} size={size} />
           ),
-        }}
-      />
-
-      {/* Hide MusicScreen from Tab Bar */}
-      <Tabs.Screen
-        name="screens/MusicScreen"
-        options={{
-          tabBarButton: () => null, // Hides this screen from Tab Bar
-        }}
-      />
-      {/* Hide LyricsScreen from Tab Bar */}
-      <Tabs.Screen
-        name="screens/LyricsScreen"
-        options={{
-          tabBarButton: () => null, // Hides this screen from Tab Bar
         }}
       />
     </Tabs>
