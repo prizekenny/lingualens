@@ -15,8 +15,8 @@ export const fetchWordFromDatabase = async (wordName) => {
         phonetic: wordData.phonetic || "",
         translation: wordData.translation || "",
         definitions: wordData.definitions.map((def) => ({
-          original: def.definition,
-          translated: def.translation || "Translation unavailable",
+          definition: def.definition,
+          translation: def.translation || "Translation unavailable",
           example: def.example || "",
           exampleTranslation: def.exampleTranslation || "",
         })),
@@ -74,9 +74,10 @@ export const fetchWordFromAPI = async (wordName) => {
 
     // **构造定义列表**
     const definitions = details.definitions.map((def, index) => ({
-      original: def.definition,
-      translated: translatedDefinitions[index] || "Translation unavailable",
+      definition: def.definition,
+      translation: translatedDefinitions[index] || "Translation unavailable",
       example: def.example || "",
+      exampleTranslation: "",
     }));
 
     return {
@@ -95,13 +96,25 @@ export const fetchWordFromAPI = async (wordName) => {
 /**
  * 3️⃣ 自动判断获取方式（数据库优先，API 兜底）
  */
-export const getWordData = async (wordName) => {
-  console.log(`📌 获取 "${wordName}" 数据`);
+export const getWordData = async (wordName, currentLanguage) => {
+  console.log(`📌 获取 "${wordName}" 数据，当前语言: ${currentLanguage}`);
 
   // **优先查数据库**
   let wordData = await fetchWordFromDatabase(wordName);
+  
+  // 如果从数据库获取到了数据，但语言环境已变更，则需要重新获取翻译
+  if (wordData && wordData.language !== currentLanguage) {
+    console.log(`📌 语言已更改(${wordData.language} -> ${currentLanguage})，重新获取翻译`);
+    return await fetchWordFromAPI(wordName);
+  }
+  
   if (wordData) return wordData;
 
   // **数据库里没有，就从 API 获取**
-  return await fetchWordFromAPI(wordName);
+  const apiData = await fetchWordFromAPI(wordName);
+  if (apiData) {
+    // 添加当前语言标记
+    apiData.language = currentLanguage;
+  }
+  return apiData;
 };

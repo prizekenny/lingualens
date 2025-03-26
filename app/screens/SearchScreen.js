@@ -10,6 +10,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { getWordData } from "../services/WordService";
 import WordCard from "../../components/WordCard";
+import { useTranslation } from "../i18n/useTranslation";
 
 const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -17,6 +18,7 @@ const SearchScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [showWordCard, setShowWordCard] = useState(false);
+  const { t } = useTranslation();
 
   // 🔹 处理查询
   const handleSearch = async () => {
@@ -61,7 +63,7 @@ const SearchScreen = () => {
           <Ionicons name="search" size={20} color="#aaa" className="mr-2" />
           <TextInput
             className="flex-1 pl-2 pb-1 text-base text-gray-800 bg-transparent"
-            placeholder="Enter a word..."
+            placeholder={t('search.placeholder')}
             placeholderTextColor="#aaa"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -74,7 +76,7 @@ const SearchScreen = () => {
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={handleSearch}>
-            <Text className="text-orange-500 font-bold">Translate</Text>
+            <Text className="text-orange-500 font-bold">{t('common.translate')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -99,7 +101,7 @@ const SearchScreen = () => {
             >
               <Text className="text-lg font-bold">{wordData.word}</Text>
               <Text className="text-sm text-gray-600">{wordData.translation?.substring(0, 100)}...</Text>
-              <Text className="text-orange-500 mt-2">点击查看详情</Text>
+              <Text className="text-orange-500 mt-2">{t('search.viewDetails')}</Text>
             </TouchableOpacity>
           </View>
         )}

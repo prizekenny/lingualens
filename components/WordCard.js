@@ -15,6 +15,7 @@ import {
 } from "../app/services/DatabaseService";
 import { getWordData } from "../app/services/WordService";
 import { Keyboard } from "react-native";
+import { useTranslation } from "../app/i18n/useTranslation";
 
 const WordCard = ({ wordName, onClose }) => {
   const [wordDetails, setWordDetails] = useState(null);
@@ -22,24 +23,25 @@ const WordCard = ({ wordName, onClose }) => {
   const [isFavorited, setIsFavorited] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: "" });
   const [fadeAnim] = useState(new Animated.Value(0));
+  const { t } = useTranslation();
 
   useEffect(() => {
     const loadWord = async () => {
       setLoading(true);
       try {
-        const data = await getWordData(wordName);
+        const data = await getWordData(wordName, t.language || 'en');
         if (data) {
           setWordDetails(data);
           setIsFavorited(await isFavorite(wordName));
         }
       } catch (error) {
-        console.error("❌ 加载单词失败:", error);
+        console.error(`❌ ${t('error.loadWordFailed')}`, error);
       }
       setLoading(false);
     };
 
     loadWord();
-  }, [wordName]);
+  }, [wordName, t.language]);
 
   // 显示自动消失的提示消息
   const showToast = (message) => {
@@ -71,14 +73,14 @@ const WordCard = ({ wordName, onClose }) => {
       if (isFavorited) {
         await removeFavorite(wordName);
         setIsFavorited(false);
-        showToast("Removed from favorites");
+        showToast(t('toast.removedFromFavorites'));
       } else {
         await addFavorite(wordDetails);
         setIsFavorited(true);
-        showToast("Added to favorites");
+        showToast(t('toast.addedToFavorites'));
       }
     } catch (err) {
-      console.error("❌ 收藏操作失败:", err);
+      console.error(`❌ ${t('error.favoriteOperationFailed')}`, err);
     }
   };
 
@@ -145,25 +147,25 @@ const WordCard = ({ wordName, onClose }) => {
                     isPopup ? "text-gray-200" : "text-gray-800"
                   }`}
                 >
-                  {index + 1}. {item.original}
+                  {index + 1}. {item.definition}
                 </Text>
                 <Text
                   className={`text-xs mt-1 ${
                     isPopup ? "text-gray-400" : "text-gray-600"
                   }`}
                 >
-                  {item.translated}
+                  {item.translation}
                 </Text>
               </View>
             ))
           ) : (
             <Text className="text-sm text-gray-400">
-              No definitions available
+              {t('wordCard.noDefinitions')}
             </Text>
           )}
         </ScrollView>
       ) : (
-        <Text className="text-sm text-gray-400">No data found</Text>
+        <Text className="text-sm text-gray-400">{t('wordCard.noDataFound')}</Text>
       )}
 
       {/* 自动消失的提示消息 */}
