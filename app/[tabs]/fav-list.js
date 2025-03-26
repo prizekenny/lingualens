@@ -2,11 +2,11 @@
 // import React from "react";
 // import FavoritesScreen from "../screens/FavoritesScreen";
 
-// const FavListTab = () => {
-//   return <FavoritesScreen />;
-// };
-
-// export default FavListTab;
-
+import React from "react";
 import FavListScreen from "../screens/FavListScreen";
-export default FavListScreen;
+
+const FavListTab = () => {
+  return <FavListScreen />;
+};
+
+export default FavListTab;

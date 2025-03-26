@@ -41,15 +41,6 @@ export default function Layout() {
           ),
         }}
       />
-      {/* <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" color={color} size={size} />
-          ),
-        }}
-      /> */}
       <Tabs.Screen
         name="settings"
         options={{
@@ -57,21 +48,6 @@ export default function Layout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings-outline" color={color} size={size} />
           ),
-        }}
-      />
-
-      {/* Hide MusicScreen from Tab Bar */}
-      <Tabs.Screen
-        name="screens/MusicScreen"
-        options={{
-          tabBarButton: () => null, // Hides this screen from Tab Bar
-        }}
-      />
-      {/* Hide LyricsScreen from Tab Bar */}
-      <Tabs.Screen
-        name="screens/LyricsScreen"
-        options={{
-          tabBarButton: () => null, // Hides this screen from Tab Bar
         }}
       />
     </Tabs>

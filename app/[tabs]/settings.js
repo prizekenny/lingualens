@@ -1,2 +1,8 @@
+import React from "react";
 import SettingsScreen from "../screens/SettingsScreen";
-export default SettingsScreen;
+
+const SettingsTab = () => {
+  return <SettingsScreen />;
+};
+
+export default SettingsTab;

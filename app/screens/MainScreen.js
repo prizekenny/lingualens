@@ -251,7 +251,8 @@ const MainScreen = () => {
       </View>
 
       {selectedWord && (
-        <View
+        <TouchableOpacity
+          activeOpacity={1}
           style={{
             position: "absolute",
             top: 0,
@@ -263,12 +264,20 @@ const MainScreen = () => {
             alignItems: "center",
             zIndex: 1000,
           }}
+          onPress={() => setSelectedWord(null)}
         >
-          <WordCard
-            wordName={selectedWord.name}
-            onClose={() => setSelectedWord(null)}
-          />
-        </View>
+          <View 
+            style={{ 
+              overflow: 'hidden',
+              borderRadius: 12
+            }}
+          >
+            <WordCard
+              wordName={selectedWord.name}
+              onClose={() => setSelectedWord(null)}
+            />
+          </View>
+        </TouchableOpacity>
       )}
     </View>
   );

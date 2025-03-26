@@ -114,11 +114,20 @@ const FavListScreen = () => {
 
       {/* 弹出 WordCard */}
       <Modal visible={selectedWord !== null} transparent animationType="fade">
-        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
-          {selectedWord && (
-            <WordCard wordName={selectedWord} onClose={handleCloseWordCard} />
-          )}
-        </View>
+        <TouchableOpacity 
+          activeOpacity={1}
+          style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onPress={handleCloseWordCard}
+        >
+          <TouchableOpacity 
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()} 
+          >
+            {selectedWord && (
+              <WordCard wordName={selectedWord} onClose={handleCloseWordCard} />
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </View>
   );

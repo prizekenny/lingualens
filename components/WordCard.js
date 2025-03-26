@@ -4,8 +4,8 @@ import {
   Text,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   ScrollView,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -20,6 +20,8 @@ const WordCard = ({ wordName, onClose }) => {
   const [wordDetails, setWordDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isFavorited, setIsFavorited] = useState(false);
+  const [toast, setToast] = useState({ visible: false, message: "" });
+  const [fadeAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
     const loadWord = async () => {
@@ -39,17 +41,41 @@ const WordCard = ({ wordName, onClose }) => {
     loadWord();
   }, [wordName]);
 
+  // 显示自动消失的提示消息
+  const showToast = (message) => {
+    setToast({ visible: true, message });
+    
+    // 淡入动画
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+    
+    // 设置定时器，2秒后自动隐藏
+    setTimeout(() => {
+      // 淡出动画
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        setToast({ visible: false, message: "" });
+      });
+    }, 2000);
+  };
+
   // 切换收藏状态
   const handleToggleFavorite = async () => {
     try {
       if (isFavorited) {
         await removeFavorite(wordName);
         setIsFavorited(false);
-        Alert.alert("Removed from favorites");
+        showToast("Removed from favorites");
       } else {
         await addFavorite(wordDetails);
         setIsFavorited(true);
-        Alert.alert("Added to favorites");
+        showToast("Added to favorites");
       }
     } catch (err) {
       console.error("❌ 收藏操作失败:", err);
@@ -86,13 +112,15 @@ const WordCard = ({ wordName, onClose }) => {
         >
           {wordName}
         </Text>
-        <TouchableOpacity onPress={handleToggleFavorite}>
-          <Ionicons
-            name={isFavorited ? "heart" : "heart-outline"}
-            size={24}
-            color="orange"
-          />
-        </TouchableOpacity>
+        {!loading && (
+          <TouchableOpacity onPress={handleToggleFavorite}>
+            <Ionicons
+              name={isFavorited ? "heart" : "heart-outline"}
+              size={24}
+              color="orange"
+            />
+          </TouchableOpacity>
+        )}
       </View>
 
       {loading ? (
@@ -138,13 +166,27 @@ const WordCard = ({ wordName, onClose }) => {
         <Text className="text-sm text-gray-400">No data found</Text>
       )}
 
-      {isPopup && (
-        <TouchableOpacity
-          onPress={onClose}
-          className="mt-3 bg-red-500 rounded-full py-2 px-4 self-center"
+      {/* 自动消失的提示消息 */}
+      {toast.visible && (
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: '50%',           // 放置在垂直中心
+            left: 0,
+            right: 0,
+            transform: [{ translateY: -20 }],  // 微调位置，向上偏移一点
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            padding: 10,
+            borderRadius: 5,
+            marginHorizontal: 20,  // 水平方向留出空间
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: fadeAnim,
+            zIndex: 100,          // 确保显示在其他内容之上
+          }}
         >
-          <Text className="text-white text-center font-bold">Close</Text>
-        </TouchableOpacity>
+          <Text style={{ color: 'white', fontWeight: 'bold' }}>{toast.message}</Text>
+        </Animated.View>
       )}
     </View>
   );
