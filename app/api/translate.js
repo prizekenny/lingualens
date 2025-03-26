@@ -14,6 +14,15 @@ export async function translate(text, sourceLang = "en", targetLang = null) {
       const currentLanguage = global.currentLanguage || "zh-CN";
       const { languageCodeMap } = require("../screens/SettingsScreen");
       targetLang = languageCodeMap[currentLanguage] || "ZH";
+      
+      // 添加调试日志
+      console.log(`Translate: currentLanguage=${currentLanguage}, targetLang=${targetLang}`);
+    }
+    
+    // 如果目标语言是英文，直接返回原文
+    if (targetLang.toUpperCase() === "EN" || targetLang.toUpperCase() === "EN-GB") {
+      console.log("英文模式：跳过翻译", text);
+      return text;
     }
 
     const response = await axios.post(

@@ -43,8 +43,16 @@ export const fetchWordFromAPI = async (wordName) => {
       return null;
     }
 
-    // 翻译单词
-    const translatedWord = await translate(wordName);
+    // 获取当前语言环境
+    const currentLanguage = global.currentLanguage || "zh-CN";
+    const { languageCodeMap } = require("../screens/SettingsScreen");
+    const targetLang = languageCodeMap[currentLanguage] || "ZH";
+    
+    // 检查是否为英文模式
+    const isEnglishMode = targetLang.toUpperCase() === "EN" || targetLang.toUpperCase() === "EN-GB";
+    
+    // 翻译单词 - 英文模式下设置为空字符串
+    const translatedWord = isEnglishMode ? "" : await translate(wordName);
 
     // **合并所有定义，发送一次请求**
     const definitionsText = details.definitions
@@ -53,7 +61,7 @@ export const fetchWordFromAPI = async (wordName) => {
     console.log("📌 definitionsText:", definitionsText);
 
     let translatedDefinitions = [];
-    if (definitionsText) {
+    if (definitionsText && !isEnglishMode) { // 英文模式下不翻译定义
       const translatedText = await translate(definitionsText); // **一次翻译所有定义**
       console.log("📌 translatedText:", translatedText);
 
@@ -75,7 +83,7 @@ export const fetchWordFromAPI = async (wordName) => {
     // **构造定义列表**
     const definitions = details.definitions.map((def, index) => ({
       definition: def.definition,
-      translation: translatedDefinitions[index] || "Translation unavailable",
+      translation: isEnglishMode ? "" : (translatedDefinitions[index] || "Translation unavailable"),
       example: def.example || "",
       exampleTranslation: "",
     }));

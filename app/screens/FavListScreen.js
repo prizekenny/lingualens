@@ -97,7 +97,7 @@ const FavListScreen = () => {
                 {/* 点击单词，打开 WordCard */}
                 <TouchableOpacity onPress={() => setSelectedWord(item.word)}>
                   <Text className="text-lg font-semibold text-gray-900">
-                    {index + 1}. {item.word}
+                    {item.word}
                   </Text>
                 </TouchableOpacity>
 
@@ -121,14 +121,16 @@ const FavListScreen = () => {
           style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}
           onPress={handleCloseWordCard}
         >
-          <TouchableOpacity 
-            activeOpacity={1}
-            onPress={(e) => e.stopPropagation()} 
+          <View 
+            style={{ 
+              overflow: 'hidden',
+              borderRadius: 12 // 与WordCard一致的圆角
+            }}
           >
             {selectedWord && (
               <WordCard wordName={selectedWord} onClose={handleCloseWordCard} />
             )}
-          </TouchableOpacity>
+          </View>
         </TouchableOpacity>
       </Modal>
     </View>
