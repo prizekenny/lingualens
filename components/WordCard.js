@@ -32,7 +32,7 @@ const WordCard = ({ wordName, onClose }) => {
         const data = await getWordData(wordName, language || "en");
         if (data) {
           setWordDetails(data);
-          setIsFavorited(await isFavorite(wordName));
+          setIsFavorited(await isFavorite(wordName, language));
         }
       } catch (error) {
         console.error(`❌ ${t("error.loadWordFailed")}`, error);

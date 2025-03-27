@@ -184,7 +184,7 @@ export const removeFavorite = async (word) => {
 };
 
 // ✅ 检查单词是否已收藏
-export const isFavorite = async (word) => {
+export const isFavorite = async (word, language = "zh-CN") => {
   const db = await getDatabase();
   if (!db) {
     console.error("❌ 数据库连接丢失");
@@ -194,13 +194,15 @@ export const isFavorite = async (word) => {
   console.log("检查收藏状态:", word);
   try {
     const result = await db.getFirstAsync(
-      "SELECT word FROM favorites WHERE word = ?",
+      "SELECT * FROM favorites WHERE word = ?",
       [word.trim()]
     );
 
     console.log("检查收藏状态:", result);
 
-    return result !== undefined && result !== null;
+    return (
+      result !== undefined && result !== null && result.language === language
+    );
   } catch (error) {
     console.error("检查收藏状态失败:", error);
     return false;
