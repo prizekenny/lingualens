@@ -13,6 +13,8 @@ import { getAllFavorites, removeFavorite } from "../services/DatabaseService";
 import WordCard from "../../components/WordCard";
 import { useTranslation } from "../i18n/useTranslation";
 
+import { Pressable } from "react-native";
+
 const FavListScreen = () => {
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,12 +51,12 @@ const FavListScreen = () => {
   // 删除收藏
   const handleDelete = async (word) => {
     Alert.alert(
-      t('favorites.deleteTitle'),
-      t('favorites.deleteConfirm', { word: word }),
+      t("favorites.deleteTitle"),
+      t("favorites.deleteConfirm", { word: word }),
       [
-        { text: t('common.cancel'), style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: t('common.delete'),
+          text: t("common.delete"),
           style: "destructive",
           onPress: async () => {
             try {
@@ -62,10 +64,7 @@ const FavListScreen = () => {
               await fetchFavorites();
             } catch (error) {
               console.error("❌ 删除收藏失败:", error);
-              Alert.alert(
-                t('common.error'),
-                t('favorites.deleteError')
-              );
+              Alert.alert(t("common.error"), t("favorites.deleteError"));
             }
           },
         },
@@ -75,19 +74,19 @@ const FavListScreen = () => {
 
   return (
     <View className="flex-1 px-4 pt-14 bg-white">
-      <Text className="text-2xl font-bold mb-4">{t('favorites.title')}</Text>
+      <Text className="text-2xl font-bold mb-4">{t("favorites.title")}</Text>
 
       {loading ? (
         <View className="flex-1 justify-center items-center mt-5">
           <ActivityIndicator size="large" color="#FF914D" />
-          <Text className="text-gray-500 mt-2">{t('favorites.loading')}</Text>
+          <Text className="text-gray-500 mt-2">{t("favorites.loading")}</Text>
         </View>
       ) : favorites.length === 0 ? (
         <Text className="text-gray-500 text-center mt-10">
-          {t('favorites.empty')}
+          {t("favorites.empty")}
         </Text>
       ) : (
-        <ScrollView>
+        <ScrollView className="pr-5">
           {favorites.map((item, index) => (
             <View
               key={item.id || index}
@@ -106,7 +105,7 @@ const FavListScreen = () => {
                   onPress={() => handleDelete(item.word)}
                   className="bg-red-500 px-2 py-1 rounded-lg"
                 >
-                  <Text className="text-white">{t('common.delete')}</Text>
+                  <Text className="text-white">{t("common.delete")}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -116,22 +115,42 @@ const FavListScreen = () => {
 
       {/* 弹出 WordCard */}
       <Modal visible={selectedWord !== null} transparent animationType="fade">
-        <TouchableOpacity 
-          activeOpacity={1}
-          style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onPress={handleCloseWordCard}
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0,0,0,0.5)",
+          }}
         >
-          <View 
-            style={{ 
-              overflow: 'hidden',
-              borderRadius: 12 // 与WordCard一致的圆角
+          {/* 点击遮罩关闭 */}
+          <Pressable
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              left: 0,
+              right: 0,
+            }}
+            onPress={handleCloseWordCard}
+          />
+
+          {/* 点击卡片不会触发关闭 */}
+          <View
+            style={{
+              width: "90%",
+              maxHeight: "70%",
+              backgroundColor: "#1F2937",
+              borderRadius: 12,
+              paddingVertical: 6,
+              paddingHorizontal: 6,
             }}
           >
             {selectedWord && (
               <WordCard wordName={selectedWord} onClose={handleCloseWordCard} />
             )}
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
     </View>
   );

@@ -14,6 +14,7 @@ export const fetchWordFromDatabase = async (wordName) => {
         word: wordData.word,
         phonetic: wordData.phonetic || "",
         translation: wordData.translation || "",
+        language: wordData.language || "en", // ✅ 补上 language 字段
         definitions: wordData.definitions.map((def) => ({
           definition: def.definition,
           translation: def.translation || "Translation unavailable",
@@ -47,10 +48,11 @@ export const fetchWordFromAPI = async (wordName) => {
     const currentLanguage = global.currentLanguage || "zh-CN";
     const { languageCodeMap } = require("../screens/SettingsScreen");
     const targetLang = languageCodeMap[currentLanguage] || "ZH";
-    
+
     // 检查是否为英文模式
-    const isEnglishMode = targetLang.toUpperCase() === "EN" || targetLang.toUpperCase() === "EN-GB";
-    
+    const isEnglishMode =
+      targetLang.toUpperCase() === "EN" || targetLang.toUpperCase() === "EN-GB";
+
     // 翻译单词 - 英文模式下设置为空字符串
     const translatedWord = isEnglishMode ? "" : await translate(wordName);
 
@@ -61,7 +63,8 @@ export const fetchWordFromAPI = async (wordName) => {
     console.log("📌 definitionsText:", definitionsText);
 
     let translatedDefinitions = [];
-    if (definitionsText && !isEnglishMode) { // 英文模式下不翻译定义
+    if (definitionsText && !isEnglishMode) {
+      // 英文模式下不翻译定义
       const translatedText = await translate(definitionsText); // **一次翻译所有定义**
       console.log("📌 translatedText:", translatedText);
 
@@ -83,7 +86,9 @@ export const fetchWordFromAPI = async (wordName) => {
     // **构造定义列表**
     const definitions = details.definitions.map((def, index) => ({
       definition: def.definition,
-      translation: isEnglishMode ? "" : (translatedDefinitions[index] || "Translation unavailable"),
+      translation: isEnglishMode
+        ? ""
+        : translatedDefinitions[index] || "Translation unavailable",
       example: def.example || "",
       exampleTranslation: "",
     }));
@@ -109,13 +114,15 @@ export const getWordData = async (wordName, currentLanguage) => {
 
   // **优先查数据库**
   let wordData = await fetchWordFromDatabase(wordName);
-  
+
   // 如果从数据库获取到了数据，但语言环境已变更，则需要重新获取翻译
   if (wordData && wordData.language !== currentLanguage) {
-    console.log(`📌 语言已更改(${wordData.language} -> ${currentLanguage})，重新获取翻译`);
+    console.log(
+      `📌 语言已更改(${wordData.language} -> ${currentLanguage})，重新获取翻译`
+    );
     return await fetchWordFromAPI(wordName);
   }
-  
+
   if (wordData) return wordData;
 
   // **数据库里没有，就从 API 获取**

@@ -1,5 +1,5 @@
 import { openDatabaseAsync } from "expo-sqlite";
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from "expo-file-system";
 
 let db = null;
 
@@ -94,7 +94,13 @@ export const addFavorite = async (favorite) => {
       // 2️⃣ 如果 word 存在，执行 UPDATE
       await db.runAsync(
         "UPDATE favorites SET phonetic = ?, translation = ?, timestamp = ?, language = ? WHERE word = ?",
-        [phonetic.trim(), favorite.translation || "", timestamp, language, wordName]
+        [
+          phonetic.trim(),
+          favorite.translation || "",
+          timestamp,
+          language,
+          wordName,
+        ]
       );
       favoriteId = existingEntry.id;
       console.log("✅ 现有单词已更新:", wordName);
@@ -102,7 +108,13 @@ export const addFavorite = async (favorite) => {
       // 3️⃣ 如果 word 不存在，执行 INSERT
       await db.runAsync(
         "INSERT INTO favorites (word, phonetic, translation, timestamp, language) VALUES (?, ?, ?, ?, ?)",
-        [wordName, phonetic.trim(), favorite.translation || "", timestamp, language]
+        [
+          wordName,
+          phonetic.trim(),
+          favorite.translation || "",
+          timestamp,
+          language,
+        ]
       );
 
       // 获取新插入的 id
@@ -145,7 +157,9 @@ export const addFavorite = async (favorite) => {
         );
         console.log(`✅ 新定义插入: ${def.definition.substring(0, 30)}...`);
       } else {
-        console.log(`⚠️ 定义已存在，跳过: ${def.definition.substring(0, 30)}...`);
+        console.log(
+          `⚠️ 定义已存在，跳过: ${def.definition.substring(0, 30)}...`
+        );
       }
     }
   } catch (error) {
@@ -230,6 +244,8 @@ export const getFavoriteByWord = async (word) => {
     );
     if (!favorite) return null;
 
+    console.log("📌 获取到的 favorite 数据:", favorite);
+
     // 获取所有定义
     const definitions = await db.getAllAsync(
       "SELECT definition, translation, example, exampleTranslation FROM definitions WHERE favorite_id = ?",
@@ -250,18 +266,18 @@ export const resetDatabase = async () => {
       await db.closeAsync();
       db = null;
     }
-    
+
     // 删除数据库文件
     const dbDir = `${FileSystem.documentDirectory}SQLite/`;
     const dbPath = `${dbDir}lingualens.db`;
-    
+
     // 检查文件是否存在
     const fileInfo = await FileSystem.getInfoAsync(dbPath);
     if (fileInfo.exists) {
       await FileSystem.deleteAsync(dbPath);
       console.log("数据库文件已删除");
     }
-    
+
     // 重新初始化数据库
     db = await getDatabase();
     return true;

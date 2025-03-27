@@ -11,6 +11,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { getWordData } from "../services/WordService";
 import WordCard from "../../components/WordCard";
 import { useTranslation } from "../i18n/useTranslation";
+import { TouchableWithoutFeedback } from "react-native";
+
+import { Pressable } from "react-native";
 
 const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -32,7 +35,7 @@ const SearchScreen = () => {
       if (fetchedWordData) {
         console.log("📌 查询到的单词数据:", fetchedWordData);
         setWordData(fetchedWordData);
-        setShowWordCard(true); // 显示单词卡
+        // setShowWordCard(true); // 显示单词卡
       } else {
         setErrorMessage("No definition found.");
       }
@@ -63,7 +66,7 @@ const SearchScreen = () => {
           <Ionicons name="search" size={20} color="#aaa" className="mr-2" />
           <TextInput
             className="flex-1 pl-2 pb-1 text-base text-gray-800 bg-transparent"
-            placeholder={t('search.placeholder')}
+            placeholder={t("search.placeholder")}
             placeholderTextColor="#aaa"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -76,7 +79,9 @@ const SearchScreen = () => {
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={handleSearch}>
-            <Text className="text-orange-500 font-bold">{t('common.translate')}</Text>
+            <Text className="text-orange-500 font-bold">
+              {t("common.translate")}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -95,38 +100,64 @@ const SearchScreen = () => {
 
         {wordData && wordData.word && (
           <View className="items-center mt-5 pb-10">
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setShowWordCard(true)}
               className="bg-gray-100 p-4 rounded-lg w-full"
             >
               <Text className="text-lg font-bold">{wordData.word}</Text>
-              <Text className="text-sm text-gray-600">{wordData.translation?.substring(0, 100)}...</Text>
-              <Text className="text-orange-500 mt-2">{t('search.viewDetails')}</Text>
+              <Text className="text-sm text-gray-600">
+                {wordData.translation?.substring(0, 100)}...
+              </Text>
+              <Text className="text-orange-500 mt-2">
+                {t("search.viewDetails")}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
       </ScrollView>
 
       {/* 单词卡弹窗 */}
-      <Modal visible={showWordCard} transparent animationType="fade">
-        <TouchableOpacity 
-          activeOpacity={1}
-          style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}
-          onPress={handleCloseWordCard}
-        >
-          <View 
-            style={{ 
-              // 确保View没有额外的触摸区域
-              overflow: 'hidden',
-              borderRadius: 12 // 与WordCard一致的圆角
+      {showWordCard && wordData?.word && (
+        <Modal visible={showWordCard} transparent animationType="fade">
+          <View
+            style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+              backgroundColor: "rgba(0,0,0,0.5)",
             }}
           >
-            {wordData && wordData.word && (
-              <WordCard wordName={wordData.word} onClose={handleCloseWordCard} />
-            )}
+            {/* 点击遮罩区域关闭 */}
+            <Pressable
+              style={{
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                left: 0,
+                right: 0,
+              }}
+              onPress={handleCloseWordCard}
+            />
+
+            {/* 卡片容器，设置最大高度和边距 */}
+            <View
+              style={{
+                width: "90%",
+                maxHeight: "70%",
+                backgroundColor: "#1F2937",
+                borderRadius: 12,
+                paddingVertical: 6,
+                paddingHorizontal: 6,
+              }}
+            >
+              <WordCard
+                wordName={wordData.word}
+                onClose={handleCloseWordCard}
+              />
+            </View>
           </View>
-        </TouchableOpacity>
-      </Modal>
+        </Modal>
+      )}
     </View>
   );
 };

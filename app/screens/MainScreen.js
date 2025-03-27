@@ -8,6 +8,7 @@ import WordCard from "../../components/WordCard";
 import { useRouter } from "expo-router";
 import { StyleSheet, ActivityIndicator } from "react-native";
 import { useTranslation } from "../i18n/useTranslation";
+import { Pressable } from "react-native";
 
 const MainScreen = () => {
   const router = useRouter();
@@ -170,7 +171,9 @@ const MainScreen = () => {
           }}
         >
           <ActivityIndicator size="large" color="#FF914D" />
-          <Text style={{ color: "white", marginTop: 10 }}>{t('common.loading')}</Text>
+          <Text style={{ color: "white", marginTop: 10 }}>
+            {t("common.loading")}
+          </Text>
         </View>
       )}
 
@@ -197,7 +200,7 @@ const MainScreen = () => {
         {!imageUri && (
           <View className="absolute items-center justify-center px-10">
             <Text className="text-[#FF914D] text-lg font-semibold text-center">
-              {t('main.cameraPrompt')}
+              {t("main.cameraPrompt")}
             </Text>
           </View>
         )}
@@ -242,19 +245,18 @@ const MainScreen = () => {
           onPress={handleUpload}
           className="p-2.5 bg-[#FF914D] rounded-full px-5"
         >
-          <Text className="text-white">{t('main.upload')}</Text>
+          <Text className="text-white">{t("main.upload")}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={handleTakePhoto}
           className="p-2.5 bg-[#FF914D] rounded-full px-5"
         >
-          <Text className="text-white">{t('main.takePhoto')}</Text>
+          <Text className="text-white">{t("main.takePhoto")}</Text>
         </TouchableOpacity>
       </View>
 
       {selectedWord && (
-        <TouchableOpacity
-          activeOpacity={1}
+        <View
           style={{
             position: "absolute",
             top: 0,
@@ -266,12 +268,28 @@ const MainScreen = () => {
             alignItems: "center",
             zIndex: 1000,
           }}
-          onPress={() => setSelectedWord(null)}
         >
-          <View 
-            style={{ 
-              overflow: 'hidden',
-              borderRadius: 12
+          {/* 点击遮罩区域关闭 */}
+          <Pressable
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              left: 0,
+              right: 0,
+            }}
+            onPress={() => setSelectedWord(null)}
+          />
+
+          {/* 点击卡片区域不触发关闭 */}
+          <View
+            style={{
+              width: "90%",
+              maxHeight: "80%",
+              backgroundColor: "#1F2937",
+              borderRadius: 12,
+              paddingVertical: 6,
+              paddingHorizontal: 6,
             }}
           >
             <WordCard
@@ -279,7 +297,7 @@ const MainScreen = () => {
               onClose={() => setSelectedWord(null)}
             />
           </View>
-        </TouchableOpacity>
+        </View>
       )}
     </View>
   );
